@@ -1,35 +1,37 @@
 #include <stdio.h>
-#include <stdlib.h>
-#include <mpi.h>
+#include <string.h>
+#include <zlib.h>
 
-int main(int argc, char *argv[]) {
-    int rank, size;
-    MPI_File file;
-    MPI_Status status;
-    unsigned short data[10];
-    int i;
+#define CHUNK_SIZE 256
 
-    // Initialize MPI
-    MPI_Init(&argc, &argv);
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
+int main() {
+    const char *input = "This is the data to be compressed using zlib.";
+    size_t input_len = strlen(input) + 1; // Include the null terminator
 
-    // Initialize data array with values
-    for (i = 0; i < 10; i++) {
-        data[i] = rank * 10 + i;
+    // Allocate memory for compressed data
+    unsigned char compressed[CHUNK_SIZE];
+    uLong compressed_len = CHUNK_SIZE;
+
+    // Compress the data
+    if (compress(compressed, &compressed_len, (const unsigned char *)input, input_len) != Z_OK) {
+        fprintf(stderr, "Compression failed\n");
+        return 1;
     }
 
-    // Open the binary file for writing (create if doesn't exist)
-    MPI_File_open(MPI_COMM_WORLD, "output.bin", MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &file);
+    printf("Original size: %lu, Compressed size: %lu\n", input_len, compressed_len);
 
-    // Each process writes to a different part of the file
-    MPI_File_write_at(file, rank * 10 * sizeof(int), data, 10, MPI_UNSIGNED_SHORT, &status);
+    // Allocate memory for decompressed data
+    unsigned char decompressed[CHUNK_SIZE];
+    uLong decompressed_len = CHUNK_SIZE;
 
-    // Close the file
-    MPI_File_close(&file);
+    // Decompress the data
+    if (uncompress(decompressed, &decompressed_len, compressed, compressed_len) != Z_OK) {
+        fprintf(stderr, "Decompression failed\n");
+        return 1;
+    }
 
-    // Finalize MPI
-    MPI_Finalize();
+    printf("Decompressed size: %lu\n", decompressed_len);
+    printf("Decompressed data: %s\n", decompressed);
 
     return 0;
 }

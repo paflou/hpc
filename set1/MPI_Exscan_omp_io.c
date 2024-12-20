@@ -5,8 +5,8 @@
 #include <threads.h>
 #include <unistd.h>
 
-#define T 8
-#define N 32
+#define T 4
+#define N 16
 
 void for_loop(int step, int *prev, int *sum, int rank) {
     #pragma omp for ordered schedule(static, 1)
@@ -56,7 +56,7 @@ void initializeMatrix(double *matrix, unsigned int seed) {
     }
 }
 
-int checkMatrix(MPI_File file, int size, unsigned int *seed, int offset) {
+int checkMatrix(MPI_File file, unsigned int *seed, int offset) {
     MPI_Request request;
     MPI_Status status;
     double *values = (double *)malloc(N * N * N * sizeof(double));
@@ -132,9 +132,10 @@ int main(int argc, char *argv[]) {
         MPI_File_iwrite_at(file, start, matrix, matrixSize, MPI_DOUBLE, &request);
 
         #pragma omp barrier
-        printf("thread %d finished.\n", global_num);
+        //printf("thread %d finished.\n", global_num);
         #pragma omp barrier
-        if(checkMatrix(file, size, &seed, start)) {
+
+        if(checkMatrix(file, &seed, start)) {
             #pragma omp critical
             local_flag = 1;
         }
