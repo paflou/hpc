@@ -1,4 +1,4 @@
-from mpi4py.futures import MPIPoolExecutor # type: ignore
+from mpi4py import MPI # type: ignore
 from sklearn.neural_network import MLPClassifier # type: ignore
 from sklearn.model_selection import ParameterGrid # type: ignore
 from sklearn.datasets import make_classification # type: ignore
@@ -26,19 +26,8 @@ def evaluate(p):
     y_pred = m.predict(X_test)
     ac = accuracy_score(y_pred, y_test)
     print(ac)
-    return ac, p
+    return p, ac
 
-
-if __name__ == "__main__":
-    start_time = time.time()
-
-    with MPIPoolExecutor() as executor:
-        results = list(executor.map(evaluate, pg))
-
-    end_time = time.time()
-
-    
-    for r in results:
-        print(r)
-
-    print(f"Total Execution Time: {end_time - start_time:.2f} seconds")
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
+size = comm.Get_size()
