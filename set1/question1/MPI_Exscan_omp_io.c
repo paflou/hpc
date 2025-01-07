@@ -4,47 +4,53 @@
 #include <omp.h>
 #include <threads.h>
 #include <unistd.h>
+#include <math.h>
 
-#define T 4
-#define N 16
+int T, N;
 
-void for_loop(int step, int *prev, int *sum, int rank) {
-    #pragma omp for ordered schedule(static, 1)
+int for_loop(int unique_num, int *prev) {
+    int sum = 0;
+    //ensure that the threads are ordered
+    #pragma omp for ordered nowait
     for(int i=0; i < T; i++) {
         #pragma omp ordered
         {
-        *sum += step - 1  + *prev;
-        #pragma omp critical
-        *prev = *sum;
-        //printf("thread %d of %d computes %d\n", omp_get_thread_num(),rank, *sum);
+            sum = *prev;
+            *prev += unique_num;
         }
     }
+    return sum;
 }
 
-int MPI_Exscan_pt2pt(int size, int rank, int step, int *prev) {
-    int sum = 0;
-        int next = rank + 1;
-        int thread_num = omp_get_thread_num();
-
-        if(rank==0){
-            for_loop(step, prev, &sum, rank);
+int MPI_Exscan_omp(int size, int rank, int unique_num, int *prev) {
+    int sum;
+    int next = rank + 1;
+    int thread_num = omp_get_thread_num();
+        
+    if(rank==0){
+        sum = for_loop(unique_num, prev);
             if(thread_num == T - 1)
-                MPI_Send(&sum, 1, MPI_INT, next, rank, MPI_COMM_WORLD);
+                MPI_Send(prev, 1, MPI_INT, next, rank, MPI_COMM_WORLD);
+            //printf("thread %d of %d (global num %d) computes %d\n", thread_num, rank, unique_num, sum);
 
         } else if(rank==size-1) {
             if(thread_num == 0)
                 MPI_Recv(prev, 1, MPI_INT, rank - 1, rank - 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            for_loop(step, prev, &sum, rank);
+            sum = for_loop(unique_num, prev);
+            //printf("thread %d of %d (global num %d) computes %d\n", thread_num, rank, unique_num, sum);
 
         } else {
             if(thread_num == 0)
                 MPI_Recv(prev, 1, MPI_INT, rank - 1, rank - 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            for_loop(step, prev, &sum, rank);
+            sum = for_loop(unique_num, prev);
 
             if(thread_num == T - 1)
-                MPI_Send(&sum, 1, MPI_INT, next, rank, MPI_COMM_WORLD);
+                MPI_Send(prev, 1, MPI_INT, next, rank, MPI_COMM_WORLD);
+            //printf("thread %d of %d (global num %d) computes %d\n", thread_num, rank, unique_num, sum);
+
         }
         return sum;
+        //printf("rank %d computes %d\n",rank, sum);
 }
 
 void initializeMatrix(double *matrix, unsigned int seed) {
@@ -52,25 +58,24 @@ void initializeMatrix(double *matrix, unsigned int seed) {
                 matrix[i] = (double)rand_r(&seed) / RAND_MAX;
 
                 //testing
-                //matrix[i] =   0x0001020304050607;
+                //matrix[i] =   100;
     }
 }
 
 int checkMatrix(MPI_File file, unsigned int *seed, int offset) {
-    MPI_Request request;
     MPI_Status status;
     double *values = (double *)malloc(N * N * N * sizeof(double));
 
-    MPI_File_iread_at(file, offset, values, N*N*N, MPI_DOUBLE, &request);
-    //wait until the read is complete
-    MPI_Wait(&request, &status);
+    MPI_File_read_at_all(file, offset, values, N*N*N, MPI_DOUBLE, &status);
+    
     for (int i = 0; i < N*N*N; i++) {
         double val = (double)rand_r(seed) / RAND_MAX;
 
         //testing purposes
-        //double val = 0x0001020304050607;
-        if(values[i] != val) {
-            printf("values[%d] = %.5f, expected %f [ thread %d ]\n", i, values[i], val, omp_get_thread_num());
+        //double val = 100;
+        //printf("values[%d] = %.5f, expected %.5f [ thread %d ]\n", i, values[i], val, omp_get_thread_num());
+        if(fabs(values[i] - val) > 0.0001) {
+            printf("ERROR DETECTED: values[%d] = %.5f, expected %.5f [ thread %d ]\n", i, values[i], val, omp_get_thread_num());
             free(values);
             return 1;
         }
@@ -82,7 +87,7 @@ int checkMatrix(MPI_File file, unsigned int *seed, int offset) {
 int main(int argc, char *argv[]) {
     MPI_File file;
     const char *filename = "output.bin";
-    MPI_Request request;
+    MPI_Status status;
     int provided;
 
     MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
@@ -94,6 +99,13 @@ int main(int argc, char *argv[]) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
+    if (argc < 3) {
+        printf("Usage: %s <number of threads> <N (matrix = N*N*N)>\n", argv[0]);
+        return 1;
+    }
+    T = atoi(argv[1]);
+    N = atoi(argv[2]);
+
     int prev = 0;
     int local_flag = 0;
     int global_flag;
@@ -103,13 +115,13 @@ int main(int argc, char *argv[]) {
         MPI_File_delete("output.bin", MPI_INFO_NULL);
     }
 
-    MPI_Barrier(MPI_COMM_WORLD); // Ensure all processes sync before proceeding
+    MPI_Barrier(MPI_COMM_WORLD);
     MPI_File_open(MPI_COMM_WORLD, filename, MPI_MODE_CREATE | MPI_MODE_RDWR, MPI_INFO_NULL, &file);
 
     #pragma omp parallel num_threads(T) shared(prev, local_flag)
     {
-        int global_num = omp_get_thread_num() + rank * T;
-        unsigned int seed = global_num;
+        int unique_num = omp_get_thread_num() + rank * T;
+        unsigned int seed = unique_num;
 
         double *matrix= (double *)malloc(N * N * N * sizeof(double));
 
@@ -117,24 +129,21 @@ int main(int argc, char *argv[]) {
 
         int matrixSize = N * N * N;
 
-        #pragma omp barrier
-        int end = MPI_Exscan_pt2pt(size, rank, matrixSize, &prev);
+        //simutaneously start all threads
+        #pragma omp single
+        MPI_Barrier(MPI_COMM_WORLD);
+        int start = MPI_Exscan_omp(size, rank, matrixSize, &prev);
 
-        int start = end - matrixSize + 1;
-
-        start += global_num;
+        int end = start + matrixSize;
         start *= sizeof(double);
-        end += global_num + 1;
         end *= sizeof(double);
+        end--;
 
-        //printf("thread %d begins writing at %d and ends at %d. 1st val = %f\n", global_num, start, end, matrix[0]);
+        //printf("thread %d begins writing at %d and ends at %d. 1st val = %f\n", unique_num, start, end, matrix[0]);
+        MPI_File_write_at_all(file, start, matrix, matrixSize, MPI_DOUBLE, &status);
+        //printf("thread %d finished.\n", unique_num);
+        
         #pragma omp barrier
-        MPI_File_iwrite_at(file, start, matrix, matrixSize, MPI_DOUBLE, &request);
-
-        #pragma omp barrier
-        //printf("thread %d finished.\n", global_num);
-        #pragma omp barrier
-
         if(checkMatrix(file, &seed, start)) {
             #pragma omp critical
             local_flag = 1;
@@ -142,13 +151,11 @@ int main(int argc, char *argv[]) {
         free(matrix);
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);
     MPI_File_close(&file);
-    MPI_Barrier(MPI_COMM_WORLD);
     MPI_Reduce(&local_flag, &global_flag, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
 
-    if(rank ==0) {
-        global_flag ? printf("The binary file is wrong") : printf("The binary file is correct");
+    if(rank == 0) {
+        global_flag ? printf("\nThe binary file is wrong\n") : printf("\nThe binary file is correct\n");
     }
     MPI_Finalize();
     return 0;
