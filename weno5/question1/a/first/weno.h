@@ -1,6 +1,6 @@
 #pragma once
 
-float weno_minus_core(const float a, const float b, const float c, const float d, const float e)
+static inline float weno_minus_core(const float a, const float b, const float c, const float d, const float e)
 {
 		const float is0 = a*(a*(float)(4./3.)  - b*(float)(19./3.)  + c*(float)(11./3.)) + b*(b*(float)(25./3.)  - c*(float)(31./3.)) + c*c*(float)(10./3.);
 		const float is1 = b*(b*(float)(4./3.)  - c*(float)(13./3.)  + d*(float)(5./3.))  + c*(c*(float)(13./3.)  - d*(float)(13./3.)) + d*d*(float)(4./3.);
@@ -25,11 +25,16 @@ float weno_minus_core(const float a, const float b, const float c, const float d
 					 omega2*((float)(1./3.)*c  + (float)(5./6.)*d - (float)(1./6.)*e);
 }
 
-void weno_minus_reference(const float * const a, const float * const b, const float * const c,
-			  const float * const d, const float * const e, float * const out,
-			  const int NENTRIES)
+void weno_minus_reference(const float * const __restrict__ a, 
+                         const float * const __restrict__ b, 
+                         const float * const __restrict__ c,
+                         const float * const __restrict__ d, 
+                         const float * const __restrict__ e, 
+                         float * const __restrict__ out,
+                         const int NENTRIES)
 {
-//#pragma omp for
-		for (int i=0; i<NENTRIES; ++i)
-			out[i] = weno_minus_core(a[i], b[i], c[i], d[i], e[i]);
+    //#pragma omp parallel for
+	#pragma GCC ivdep // tell GCC no aliasing
+    for (int i=0; i<NENTRIES; ++i)
+        out[i] = weno_minus_core(a[i], b[i], c[i], d[i], e[i]);
 }

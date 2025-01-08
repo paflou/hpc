@@ -1,8 +1,8 @@
 CC=gcc
-CFLAGS=-fopenmp -O -fopt-info-vec-optimized=vec.txt
+CFLAGS=-O -fopenmp-simd -fopenmp -ffast-math -fopt-info-vec-optimized=vec.txt
 LIBS=-lm
 
-all: bench
+all: clean bench
 
 bench: bench.c weno.h
 	$(CC) $(CFLAGS) -o bench bench.c $(LIBS)
