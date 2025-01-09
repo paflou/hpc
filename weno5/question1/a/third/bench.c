@@ -12,6 +12,8 @@
 
 #include "weno.h"
 
+double	t1, t2;
+
 float * myalloc(const int NENTRIES, const int verbose )
 {
 	const int initialize = 1;
@@ -84,8 +86,12 @@ void benchmark(int argc, char *argv[], const int NENTRIES_, const int NTIMES, co
 	float * const gold = myalloc(NENTRIES, verbose);
 	float * const result = myalloc(NENTRIES, verbose);
 
+	t1 = get_wtime();
 	weno_minus_reference(a, b, c, d, e, gold, NENTRIES);
 	weno_minus_reference(a, b, c, d, e, result, NENTRIES);
+	t2 = get_wtime();
+
+	printf("\n\n\nWeno time: %f\n\n\n", t2-t1);
 
 	const double tol = 1e-5;
 	printf("minus: verifying accuracy with tolerance %.5e...", tol);

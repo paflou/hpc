@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-fopenmp -O -fopt-info-vec-optimized=vec.txt
+CFLAGS=-fopenmp -O1 -fopt-info-vec-optimized
 LIBS=-lm
 
 all: bench
@@ -8,4 +8,4 @@ bench: bench.c weno.h
 	$(CC) $(CFLAGS) -o bench bench.c $(LIBS)
 
 clean:
-	rm -f bench vec.txt perf*
+	rm -f bench perf*

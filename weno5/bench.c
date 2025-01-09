@@ -5,13 +5,14 @@
 #include <stdlib.h>
 #include <math.h>
 #include <sys/time.h>
-#include <omp.h>
 
 #ifndef WENOEPS
 #define WENOEPS 1.e-6
 #endif
 
 #include "weno.h"
+
+double	t1, t2;
 
 float * myalloc(const int NENTRIES, const int verbose )
 {
@@ -24,11 +25,13 @@ float * myalloc(const int NENTRIES, const int verbose )
 
 	if (initialize)
 	{
+		//not vectorizable due to the random initialization
 		for(int i=0; i<NENTRIES; ++i)
 			tmp[i] = drand48();
 
 		if (verbose)
 		{
+			//not vectorizable due to printf
 			for(int i=0; i<NENTRIES; ++i)
 				printf("tmp[%d] = %f\n", i, tmp[i]);
 			printf("==============\n");
@@ -47,6 +50,7 @@ double get_wtime()
 void check_error(const double tol, float ref[], float val[], const int N)
 {
 	static const int verbose = 0;
+	//not vectorizable
 	for(int i=0; i<N; ++i)
 	{
 		assert(!isnan(ref[i]));
@@ -82,8 +86,12 @@ void benchmark(int argc, char *argv[], const int NENTRIES_, const int NTIMES, co
 	float * const gold = myalloc(NENTRIES, verbose);
 	float * const result = myalloc(NENTRIES, verbose);
 
+	t1 = get_wtime();
 	weno_minus_reference(a, b, c, d, e, gold, NENTRIES);
 	weno_minus_reference(a, b, c, d, e, result, NENTRIES);
+	t2 = get_wtime();
+
+	printf("\n\n\nWeno time: %f\n\n\n", t2-t1);
 
 	const double tol = 1e-5;
 	printf("minus: verifying accuracy with tolerance %.5e...", tol);
@@ -116,6 +124,7 @@ int main (int argc, char *  argv[])
 		const int nentries =  16 * (int)(pow(32 + 6, 2) * 4);//floor(desired_kb * 1024. / 7 / sizeof(float));
 		const int ntimes = (int)floor(2. / (1e-7 * nentries));
 
+		//not vectorizable
 		for(int i=0; i<4; ++i)
 		{
 			printf("*************** PEAK-LIKE BENCHMARK (RUN %d) **************************\n", i);
@@ -128,6 +137,7 @@ int main (int argc, char *  argv[])
 		const double desired_mb =  128 * 4;
 		const int nentries =  (int)floor(desired_mb * 1024. * 1024. / 7 / sizeof(float));
 
+		//not vectorizable
 		for(int i=0; i<4; ++i)
 		{
 			printf("*************** STREAM-LIKE BENCHMARK (RUN %d) **************************\n", i);
