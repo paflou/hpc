@@ -25,13 +25,11 @@ float * myalloc(const int NENTRIES, const int verbose )
 
 	if (initialize)
 	{
-		//not vectorizable due to the random initialization
 		for(int i=0; i<NENTRIES; ++i)
 			tmp[i] = drand48();
 
 		if (verbose)
 		{
-			//not vectorizable due to printf
 			for(int i=0; i<NENTRIES; ++i)
 				printf("tmp[%d] = %f\n", i, tmp[i]);
 			printf("==============\n");
@@ -50,7 +48,7 @@ double get_wtime()
 void check_error(const double tol, float ref[], float val[], const int N)
 {
 	static const int verbose = 0;
-	//not vectorizable
+
 	for(int i=0; i<N; ++i)
 	{
 		assert(!isnan(ref[i]));
@@ -124,7 +122,6 @@ int main (int argc, char *  argv[])
 		const int nentries =  16 * (int)(pow(32 + 6, 2) * 4);//floor(desired_kb * 1024. / 7 / sizeof(float));
 		const int ntimes = (int)floor(2. / (1e-7 * nentries));
 
-		//not vectorizable
 		for(int i=0; i<4; ++i)
 		{
 			printf("*************** PEAK-LIKE BENCHMARK (RUN %d) **************************\n", i);
@@ -137,7 +134,6 @@ int main (int argc, char *  argv[])
 		const double desired_mb =  128 * 4;
 		const int nentries =  (int)floor(desired_mb * 1024. * 1024. / 7 / sizeof(float));
 
-		//not vectorizable
 		for(int i=0; i<4; ++i)
 		{
 			printf("*************** STREAM-LIKE BENCHMARK (RUN %d) **************************\n", i);
