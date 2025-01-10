@@ -8,6 +8,8 @@
 
 int T, N;
 
+#define INDEX(i, j, k) ((i) * N * N + (j) * N + (k))
+
 int for_loop(int unique_num, int *prev) {
     int sum = 0;
     //ensure that the threads are ordered
@@ -54,34 +56,50 @@ int MPI_Exscan_omp(int size, int rank, int unique_num, int *prev) {
 }
 
 void initializeMatrix(double *matrix, unsigned int seed) {
-    for (int i = 0; i < N*N*N; i++) {
-                matrix[i] = (double)rand_r(&seed) / RAND_MAX;
+    #pragma omp for collapse(3)
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < N; j++) {
+            for (int k = 0; k < N; k++) {
+                int index = INDEX(i, j, k);
+                matrix[index] = (double)rand_r(&seed) / RAND_MAX;
 
                 //testing
-                //matrix[i] =   100;
+                //printf("index: %d", index);
+                //matrix[index] =   100;
+                //printf("matrix[%d] = %f\n",index, matrix[index]);
+            }
+        }
     }
 }
+
 
 int checkMatrix(MPI_File file, unsigned int *seed, int offset) {
     MPI_Status status;
     double *values = (double *)malloc(N * N * N * sizeof(double));
+    int error_found = 0;
 
     MPI_File_read_at_all(file, offset, values, N*N*N, MPI_DOUBLE, &status);
-    
-    for (int i = 0; i < N*N*N; i++) {
-        double val = (double)rand_r(seed) / RAND_MAX;
+    #pragma omp for collapse(3)
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < N; j++) {
+            for (int k = 0; k < N; k++) {
+                if (error_found) continue;
 
-        //testing purposes
-        //double val = 100;
-        //printf("values[%d] = %.5f, expected %.5f [ thread %d ]\n", i, values[i], val, omp_get_thread_num());
-        if(fabs(values[i] - val) > 0.0001) {
-            printf("ERROR DETECTED: values[%d] = %.5f, expected %.5f [ thread %d ]\n", i, values[i], val, omp_get_thread_num());
-            free(values);
-            return 1;
+                double val = (double)rand_r(seed) / RAND_MAX;
+
+                int index = INDEX(i, j, k);
+
+                if(fabs(values[index] - val) > 0.0001) {
+                    #pragma omp atomic write
+                    error_found = 1;
+
+                    printf("ERROR DETECTED: values[%d] = %.5f, expected %.5f [ thread %d ]\n", index, values[index], val, omp_get_thread_num());
+                }
+            }
         }
     }
     free(values);
-    return 0;
+    return error_found;
 }
 
 int main(int argc, char *argv[]) {
@@ -123,6 +141,7 @@ int main(int argc, char *argv[]) {
         int unique_num = omp_get_thread_num() + rank * T;
         unsigned int seed = unique_num;
 
+        //use 1d array for the matrix (easier + better memory locality)
         double *matrix= (double *)malloc(N * N * N * sizeof(double));
 
         initializeMatrix(matrix, seed);

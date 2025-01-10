@@ -8,6 +8,7 @@
 #include <math.h>
 
 #define BUFFER 5000000
+#define INDEX(i, j, k) ((i) * N * N + (j) * N + (k))
 
 int T, N;
 
@@ -57,13 +58,22 @@ int MPI_Exscan_omp(int size, int rank, int unique_num, int *prev) {
 }
 
 void initializeMatrix(double *matrix, unsigned int seed) {
-    for (int i = 0; i < N*N*N; i++) {
-                matrix[i] = (double)rand_r(&seed) / RAND_MAX;
+    #pragma omp for collapse(3)
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < N; j++) {
+            for (int k = 0; k < N; k++) {
+                int index = INDEX(i, j, k);
+                matrix[index] = (double)rand_r(&seed) / RAND_MAX;
 
                 //testing
-                //matrix[i] =   100.0;
+                //printf("index: %d", index);
+                //matrix[index] =   100;
+                //printf("matrix[%d] = %f\n",index, matrix[index]);
+            }
+        }
     }
 }
+
 
 int checkMatrix(MPI_File file, unsigned int *seed, unsigned long compressed_len, int offset) {
     MPI_Status status;
@@ -72,6 +82,7 @@ int checkMatrix(MPI_File file, unsigned int *seed, unsigned long compressed_len,
     double *decompressed_values = malloc(N*N*N * sizeof(double));
     uLong decompressed_len = N*N*N*sizeof(double);
 
+    int error_found = 0;
     MPI_File_read_at_all(file, offset, compressed_buffer, compressed_len, MPI_BYTE, &status);
 
     // Decompress the data
@@ -79,29 +90,39 @@ int checkMatrix(MPI_File file, unsigned int *seed, unsigned long compressed_len,
         fprintf(stderr, "Decompression failed\n");
         return 1;
     }
+    #pragma omp for collapse(3)
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < N; j++) {
+            for (int k = 0; k < N; k++) {
+                if(error_found) continue;
+                
+                double val = (double)rand_r(seed) / RAND_MAX;
 
-    for (int i = 0; i < N*N*N; i++) {
-        double val = (double)rand_r(seed) / RAND_MAX;
-
-        //testing purposes
-        //double val = 100.0;
-        //printf("values[%d] = %.5f, expected %.5f [ thread %d ]\n", i, decompressed_values[i], val, omp_get_thread_num());
-        if(fabs(decompressed_values[i] - val) > 0.0001) {
-            printf("ERROR DETECTED: values[%d] = %.5f, expected %.5f [ thread %d ]\n", i, decompressed_values[i], val, omp_get_thread_num());
-            free(compressed_buffer);
-            free(decompressed_values);
-            return 1;
+                int index = INDEX(i, j, k);
+                        
+                if(fabs(decompressed_values[index] - val) > 0.0001) {
+                    printf("ERROR DETECTED: values[%d] = %.5f, expected %.5f [ thread %d ]\n", index, decompressed_values[index], val, omp_get_thread_num());
+                    #pragma omp atomic write
+                    error_found = 1;
+                }
+                //testing
+                //printf("index: %d", index);
+                //decompressed_values[index] =   100;
+                //printf("matrix[%d] = %f\n",index, decompressed_values[index]);
+            }
         }
     }
+
     free(compressed_buffer);
     free(decompressed_values);
-    return 0;
+    return error_found;
 }
+
 
 int main(int argc, char *argv[]) {
     MPI_File file;
-    MPI_Status status;
     const char *filename = "output.bin";
+    MPI_Status status;
     int provided;
 
     MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
@@ -117,7 +138,6 @@ int main(int argc, char *argv[]) {
         printf("Usage: %s <number of threads> <N (matrix = N*N*N)>\n", argv[0]);
         return 1;
     }
-
     T = atoi(argv[1]);
     N = atoi(argv[2]);
 

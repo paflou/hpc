@@ -1,6 +1,9 @@
 {
     "C_Cpp.errorSquiggles": "disabled",
     "files.associations": {
-        "random": "cpp"
+        "random": "cpp",
+        "functional": "c",
+        "atomic": "c",
+        "*.tcc": "c"
     }
 }
