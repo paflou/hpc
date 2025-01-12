@@ -1,0 +1,28 @@
+Starting benchmarks...
+Testing N=32
+N=32 complete: CUDA=0.0001s, CPU=0.0006s
+Testing N=64
+N=64 complete: CUDA=0.0002s, CPU=0.0046s
+Testing N=128
+N=128 complete: CUDA=0.0004s, CPU=0.0384s
+Testing N=256
+N=256 complete: CUDA=0.0018s, CPU=0.3186s
+Testing N=512
+N=512 complete: CUDA=0.0068s, CPU=4.5771s
+Testing N=1024
+Traceback (most recent call last):
+  File "/home/hpcgrp14/hpc/set2/question2/plot.py", line 60, in <module>
+    main()
+  File "/home/hpcgrp14/hpc/set2/question2/plot.py", line 48, in main
+    cuda_time, cpu_time = run_program()
+  File "/home/hpcgrp14/hpc/set2/question2/plot.py", line 28, in run_program
+    result = subprocess.run('./cuda_program', capture_output=True, text=True)
+  File "/usr/lib/python3.10/subprocess.py", line 505, in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+  File "/usr/lib/python3.10/subprocess.py", line 1154, in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+  File "/usr/lib/python3.10/subprocess.py", line 2021, in _communicate
+    ready = selector.select(timeout)
+  File "/usr/lib/python3.10/selectors.py", line 416, in select
+    fd_event_list = self._selector.poll(timeout)
+KeyboardInterrupt

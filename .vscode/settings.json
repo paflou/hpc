@@ -4,6 +4,10 @@
         "random": "cpp",
         "functional": "c",
         "atomic": "c",
-        "*.tcc": "c"
+        "*.tcc": "c",
+        "threads.h": "c",
+        "cmath": "cpp",
+        "chrono": "cpp",
+        "ranges": "cpp"
     }
 }
