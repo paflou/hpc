@@ -5,7 +5,7 @@
 #include <cublas_v2.h>
 #include <omp.h>
 
-#define N 4096
+#define N 5000
 #define INDEX(i, j) (i * N + j)
 
 double t1, t2;
