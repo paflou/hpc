@@ -23,21 +23,25 @@ def compile_cuda():
 def run_program(times=3):
     cuda_times = []
     cpu_times = []
-    
+    cublas_times = []
+
     for _ in range(times):
         result = subprocess.run('./cuda_program', capture_output=True, text=True)
         for line in result.stdout.split('\n'):
-            if 'CUDA (CUBLAS)' in line:
+            if 'Custom CUDA:' in line:
                 time = float(line.split('Took')[-1].replace('seconds', '').strip())
                 cuda_times.append(time)
-            elif 'CPU: First' in line:
+            elif 'CPU:' in line:
                 time = float(line.split('Took')[-1].replace('seconds', '').strip())
                 cpu_times.append(time)
+            elif 'cuBLAS CUDA :' in line:
+                time = float(line.split('Took')[-1].replace('seconds', '').strip())
+                cublas_times.append(time)
     
-    return mean(cuda_times), mean(cpu_times)
+    return mean(cuda_times), mean(cpu_times), mean(cublas_times)
 
 def main():
-    n_values = [32, 64, 128, 256, 512, 1024,2048,4096]
+    n_values = [32, 64]
     results = []
     
     print("Starting benchmarks...")
@@ -45,13 +49,13 @@ def main():
         print(f"Testing N={n}")
         modify_n(n)
         compile_cuda()
-        cuda_time, cpu_time = run_program()
-        results.append([n, cuda_time, cpu_time, cpu_time/cuda_time])
-        print(f"N={n} complete: CUDA={cuda_time:.4f}s, CPU={cpu_time:.4f}s")
+        cuda_time, cpu_time, cublas_time = run_program()
+        results.append([n, cuda_time, cpu_time, cublas_time, cpu_time/cuda_time])
+        print(f"N={n} complete: CUDA={cuda_time:.4f}s, CPU={cpu_time:.4f}s, cuBLAS={cublas_time:.4f}s")
     
     with open('benchmark_results.csv', 'w', newline='') as f:
         writer = csv.writer(f)
-        writer.writerow(['N', 'CUDA_time', 'CPU_time', 'Speedup'])
+        writer.writerow(['N', 'CUDA_time', 'CPU_time', "CUBLAS_time", 'Speedup'])
         writer.writerows(results)
     
     print("\nResults saved to benchmark_results.csv")

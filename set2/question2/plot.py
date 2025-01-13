@@ -8,7 +8,9 @@ data = pd.read_csv(file_name)
 # Extract columns
 N = data['N']
 CUDA_time = data['CUDA_time']
+CUBLAS_time = data['CUBLAS_time']
 CPU_time = data['CPU_time']
+
 Speedup = data['Speedup']
 
 # Plot 1: Execution Times
