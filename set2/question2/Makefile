@@ -1,5 +1,5 @@
 NVCC = nvcc
-NVCCFLAGS = -O3 -lm -lcublas
+NVCCFLAGS = -lm -lcublas
 
 TARGET = cuda
 SRC = cuda.cu

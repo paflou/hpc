@@ -1,3 +1,4 @@
+#include "headers/def.h"
 #include <stdio.h>
 #include <math.h>
 #include <sys/time.h>
@@ -5,127 +6,16 @@
 #include <cublas_v2.h>
 #include <omp.h>
 
-#define N 16384
-#define INDEX(i, j) (i * N + j)
+#define N 8192
+#include "headers/cuda_shared.h"
+#include "headers/cuda_cublas.h"
+#include "headers/cpu.h"
+#include "headers/cuda_global.h"
 
-double t1, t2;
-
-double get_wtime()
-{
-    struct timeval t;
-    gettimeofday(&t, NULL);
-    return t.tv_sec + t.tv_usec * 1e-6;
-}
-
-void CPUvecAdd(double *a, double *b, double *c)
-{
-    for (int i = 0; i < N * N; i++)
-    {
-        c[i] = a[i] + b[i];
-    }
-}
-
-void CPUvecSub(double *a, double *b, double *c)
-{
-    for (int i = 0; i < N * N; i++)
-    {
-        c[i] = a[i] - b[i];
-    }
-}
-
-void CPUmatMult(double *result, double *a, double *b)
-{
-    // Zero the result matrix first
-    //memset(result, 0, N * N * sizeof(double));
-
-    // Column-major ordering (j,i,k)
-    for (int j = 0; j < N; j++)
-    {
-        for (int i = 0; i < N; i++)
-        {
-            for (int k = 0; k < N; k++)
-            {
-                result[j * N + i] += a[k * N + i] * b[j * N + k];
-            }
-        }
-    }
-}
-
-void initializeMatrix(double *matrix, unsigned int seed)
-{
-#pragma omp for collapse(2)
-    for (int i = 0; i < N; i++)
-    {
-        for (int j = 0; j < N; j++)
-        {
-            int index = INDEX(i, j);
-            matrix[index] = (double)rand_r(&seed) / RAND_MAX;
-            // matrix[index] = 5; // testing
-        }
-    }
-}
-
-void printMatrix(double *matrix)
-{
-    for (int i = 0; i < N; i++)
-    {
-        for (int j = 0; j < N; j++)
-        {
-            printf("\t%f", matrix[INDEX(i, j)]);
-        }
-        printf("\n");
-    }
-}
-
-int compareMatrices(double *a, double *b)
-{
-    for (int i = 0; i < N * N; i++)
-    {
-        if (fabs(a[i] - b[i]) > 1e-5)
-        {
-            printf("Matrices are not equal at index %d: %f != %f\n", i, a[i], b[i]);
-            return 0;
-        }
-    }
-    printf("Matrices are equal\n");
-    return 1;
-}
-
-__global__ void matMult(double *a, double *b, double *c)
-{
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j = blockIdx.y * blockDim.y + threadIdx.y;
-    if (i < N && j < N)
-    {
-        double sum = 0.0;
-        for (int k = 0; k < N; k++)
-        {
-            sum += a[k * N + i] * b[j * N + k];
-        }
-        c[j * N + i] = sum;
-    }
-}
-// ...existing code...
-__global__ void vecSub(double *a, double *b, double *c)
-{
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j = blockIdx.y * blockDim.y + threadIdx.y;
-    if (i < N && j < N)
-    {
-        c[j * N + i] = b[j * N + i] - a[j * N + i];
-    }
-}
-
-// ...existing code...
-__global__ void vecAdd(double *a, double *b, double *c)
-{
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j = blockIdx.y * blockDim.y + threadIdx.y;
-    if (i < N && j < N)
-    {
-        c[j * N + i] = b[j * N + i] + a[j * N + i];
-    }
-}
+double t1, t2, cuda_global_time, cuda_shared_time, cublas_time, cpu_time;
+double *d_A, *d_B, *d_C, *d_D, *d_E, *d_F;
+double *d_temp, *d_temp2;
+cudaStream_t stream1, stream2;
 
 int main(int argc, char **argv)
 {
@@ -142,6 +32,8 @@ int main(int argc, char **argv)
 
     // Use 1D array for N*N matrixes
     // Host
+    printf("initializing matrices\n");
+    t1 = get_wtime();
     double *A = (double *)malloc(sizeof(double) * N * N);
     double *B = (double *)malloc(sizeof(double) * N * N);
     double *C = (double *)malloc(sizeof(double) * N * N);
@@ -152,6 +44,8 @@ int main(int argc, char **argv)
     double *F_blas = (double *)malloc(sizeof(double) * N * N);
     double *E_cuda = (double *)malloc(sizeof(double) * N * N);
     double *F_cuda = (double *)malloc(sizeof(double) * N * N);
+    double *E_shared = (double *)malloc(sizeof(double) * N * N);
+    double *F_shared = (double *)malloc(sizeof(double) * N * N);
     double *E_CPU = (double *)malloc(sizeof(double) * N * N);
     double *F_CPU = (double *)malloc(sizeof(double) * N * N);
 
@@ -161,102 +55,81 @@ int main(int argc, char **argv)
     initializeMatrix(B, seed[1]);
     initializeMatrix(C, seed[2]);
     initializeMatrix(D, seed[3]);
+    t2 = get_wtime();
+    printf("Matrices initialized in %.5f seconds\n", t2 - t1);
 
     // printf("First number of matrix A: %f \n", A[0]);
     // printf("First number of matrix B: %f \n", B[0]);
     // printf("First number of matrix C: %f \n", C[0]);
     // printf("First number of matrix D: %f \n", D[0]);
 
-    // Device
-    double *d_A, *d_B, *d_C, *d_D, *d_E, *d_F;
+    printf("\nAllocating memory on device\n");
+    t1 = get_wtime();
+    initializeCUDA();
+    t2 = get_wtime();
+    printf("Memory allocated on device in %.5f seconds\n", t2 - t1);
 
-    double *d_temp;
-
-    cudaMalloc((void **)&d_temp, sizeof(double) * N * N);
-    cudaMalloc((void **)&d_A, sizeof(double) * N * N);
-    cudaMalloc(&d_B, sizeof(double) * N * N);
-    cudaMalloc((void **)&d_C, sizeof(double) * N * N);
-    cudaMalloc(&d_D, sizeof(double) * N * N);
-    cudaMalloc((void **)&d_E, sizeof(double) * N * N);
-    cudaMalloc(&d_F, sizeof(double) * N * N);
-
+    printf("\nCopying data to device\n");
+    t1 = get_wtime();
     cudaMemcpy(d_A, A, N * N * sizeof(double), cudaMemcpyHostToDevice);
     cudaMemcpy(d_B, B, N * N * sizeof(double), cudaMemcpyHostToDevice);
     cudaMemcpy(d_C, C, N * N * sizeof(double), cudaMemcpyHostToDevice);
     cudaMemcpy(d_D, D, N * N * sizeof(double), cudaMemcpyHostToDevice);
+    t2 = get_wtime();
+    printf("Data copied to device in %.5f seconds\n", t2 - t1);
 
     // CUDA kernel (cuBLAS)
-    t1 = get_wtime();
-    const double alpha = 1.0;
-    const double beta = 0.0;
-    const double reverse = -1.0;
+    printf("\nRunning cuBLAS\n");
+    computeCUBLAS(handle, E_blas, F_blas);
+    //    printMatrix(F_blas);
 
-    cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, N, N, N, &alpha, d_A, N, d_C, N, &beta, d_E, N);
-    cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, N, N, N, &reverse, d_B, N, d_D, N, &alpha, d_E, N);
-
-    cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, N, N, N, &alpha, d_A, N, d_D, N, &beta, d_F, N);
-    cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, N, N, N, &alpha, d_B, N, d_C, N, &alpha, d_F, N);
-
-    cudaMemcpy(E_blas, d_E, N * N * sizeof(double), cudaMemcpyDeviceToHost);
-    cudaMemcpy(F_blas, d_F, N * N * sizeof(double), cudaMemcpyDeviceToHost);
-    t2 = get_wtime();
-
-    float cublas_time = t2 - t1;
-    printf("cuBLAS CUDA : E[0]= %f | F[0] = %f, Took %.5f seconds\n", E_blas[0], F_blas[0], cublas_time);
+    //set d_E and d_F to 0
+    cudaMemset(d_E, 0, N * N * sizeof(double));
+    cudaMemset(d_F, 0, N * N * sizeof(double));
 
     // CUDA kernel (custom)
-    t1 = get_wtime();
+    printf("\nRunning custom CUDA\n");
+    computeCUDAGlobal(E_cuda, F_cuda);
 
-    dim3 threadsPerBlock(32, 32);
-    dim3 numBlocks(4, 4);
+    //set d_E and d_F to 0
+    cudaMemset(d_E, 0, N * N * sizeof(double));
+    cudaMemset(d_F, 0, N * N * sizeof(double));
 
-    matMult<<<numBlocks, threadsPerBlock>>>(d_A, d_C, d_E);
-    matMult<<<numBlocks, threadsPerBlock>>>(d_B, d_D, d_temp);
-    vecSub<<<numBlocks, threadsPerBlock>>>(d_temp, d_E, d_E);
-
-    matMult<<<numBlocks, threadsPerBlock>>>(d_A, d_D, d_temp);
-    matMult<<<numBlocks, threadsPerBlock>>>(d_B, d_C, d_F);
-    vecAdd<<<numBlocks, threadsPerBlock>>>(d_temp, d_F, d_F);
-
-    cudaDeviceSynchronize();
-
-    cudaMemcpy(E_cuda, d_E, N * N * sizeof(double), cudaMemcpyDeviceToHost);
-    cudaMemcpy(F_cuda, d_F, N * N * sizeof(double), cudaMemcpyDeviceToHost);
-    t2 = get_wtime();
-
-    float cuda_time = t2 - t1;
-    printf("Custom CUDA: E[0]= %f | F[0] = %f, Took %.5f seconds\n", E_cuda[0], F_cuda[0], cuda_time);
-
-    printf("E: ");
-    compareMatrices(E_cuda, E_blas);
-    printf("F: ");
-    compareMatrices(F_cuda, F_blas);
+    // CUDA kernel (custom with shared memory)
+    printf("\nRunning custom CUDA (shared)\n");
+    computeCUDAShared(E_shared, F_shared);
 
     // CPU
+    printf("\nRunning CPU\n");
+    computeCPU(A, B, C, D, E_CPU, F_CPU);
 
-    t1 = get_wtime();
-    // E = BD - AC
-    //CPUmatMult(temp, A, C);        // temp = AC
-    //CPUmatMult(E_CPU, B, D);       // E_CPU = BD
-    //CPUvecSub(temp, E_CPU, E_CPU); // E_CPU = BD - AC
-//
-    //// F = AD + BC
-    //CPUmatMult(temp, A, D);        // temp = AD
-    //CPUmatMult(F_CPU, B, C);       // F_CPU = BC
-    //CPUvecAdd(F_CPU, F_CPU, temp); // F_CPU = AD + BC
-    t2 = get_wtime();
 
-    float cpu_time = t2 - t1;
-    printf("CPU: First val = %f, Took %.5f seconds\n", E_CPU[0], cpu_time);
+    printf("\nE: \n");
+    printf("Comparing cuda and blas:\t");
+    compareMatrices(E_cuda, E_blas);
+    printf("Comparing shared and blas:\t");
+    compareMatrices(E_shared, E_blas);
+    printf("Comparing cpu and blas:\t");
+    compareMatrices(E_CPU, E_blas);
 
-    float speedup = cpu_time / cuda_time;
-    printf("\nSpeedup: %f\n", speedup);
+    printf("\nF: \n");
+    printf("Comparing cuda and blas:\t");
+    compareMatrices(F_cuda, F_blas);
+    printf("Comparing shared and blas:\t");
+    compareMatrices(F_shared, F_blas);
+    printf("Comparing cpu and blas:\t\t");
+    compareMatrices(F_CPU, F_blas);
 
-    cudaFree(d_A);
-    cudaFree(d_B);
-    cudaFree(d_C);
-    cudaFree(d_D);
-    cudaFree(d_E);
+    float global_speedup = cpu_time / cuda_global_time;
+    float shared_speedup = cpu_time / cuda_shared_time;
+    float cublas_speedup = cpu_time / cublas_time;
+
+
+    printf("\nSpeedup of global: %f\n", global_speedup);
+    printf("Speedup of shared: %f\n", shared_speedup);
+    printf("Speedup of cublas: %f\n", cublas_speedup);
+
+    void cleanupCUDA();
 
     cublasDestroy(handle);
     free(A);
