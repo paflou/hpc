@@ -1,32 +1,30 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <mpi.h>
+#include <unistd.h>
 
-int MPI_Exscan_pt2pt(int size, int rank, int value) {
-    int sum = 0;
-    int next = rank + 1;
 
-    //printf(" rank %d\n", rank);
-    if(rank==0){
-        //printf("rank %d sending %d to %d\n",rank, value, next);
-        MPI_Send(&value, 1, MPI_INT, next, rank, MPI_COMM_WORLD);
-    }else if(rank==size-1) {
-        int prev = rank - 1;
-        //printf("rank %d waiting on %d\n",rank, prev);
-        MPI_Recv(&sum, 1, MPI_INT, prev, prev, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    }else {
-        int prev = rank - 1;
-        //printf("rank %d waiting on %d\n",rank, prev);
-        MPI_Recv(&sum, 1, MPI_INT, prev, prev, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        value += sum;
-        //printf("rank %d sending %d to %d\n",rank, value, next);
-        MPI_Send(&value, 1, MPI_INT, next, rank, MPI_COMM_WORLD);
+int MPI_Exscan_pt2pt(int size, int rank, int value)
+{
+    int result = 0;
+    for (int step = 1; step < size; step++)
+    {
+        int partial = 0;
+        if (rank - step >= 0)
+        {
+            MPI_Recv(&partial, 1, MPI_INT, rank - step, rank, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            result += partial;
+            //printf("rank %d computes %d iteration %d\n", rank, result, step);
+        }
+        if (rank + step < size)
+            MPI_Bsend(&value, 1, MPI_INT, rank + step, rank + step, MPI_COMM_WORLD);
     }
-    //printf("rank %d computes %d\n",rank, sum);
-    return sum;
+    //printf("rank %d computes %d\n", rank, result);
+    return result;
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
     MPI_Init(&argc, &argv);
 
     int rank, size;
@@ -35,6 +33,7 @@ int main(int argc, char *argv[]) {
 
     int result = MPI_Exscan_pt2pt(size, rank, rank);
 
+    usleep(rank * 1000);
     printf("rank %d result %d\n", rank, result);
     MPI_Finalize();
 }
