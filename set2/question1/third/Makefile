@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-O3 -fopenmp -ffast-math -march=native -fopt-info-vec-optimized
+CFLAGS=-O1 -fopenmp -ffast-math -march=native -fopt-info-vec-optimized
 LIBS=-lm
 
 all: clean bench

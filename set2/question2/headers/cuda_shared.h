@@ -7,7 +7,6 @@
 #define CUDA_SHARED_H
 extern double cuda_shared_time;
 extern double *d_A, *d_B, *d_C, *d_D, *d_E, *d_F, *d_temp, *d_temp2;
-extern cudaStream_t stream1, stream2;
 
 __global__ void matMultShared(double *a, double *b, double *c)
 {
@@ -55,13 +54,13 @@ void computeCUDAShared(double *E_shared, double *F_shared)
     dim3 threadsPerBlock(TILE_SIZE, TILE_SIZE);
     dim3 numBlocks((N + TILE_SIZE - 1) / TILE_SIZE, (N + TILE_SIZE - 1) / TILE_SIZE);
 
-    matMultShared<<<numBlocks, threadsPerBlock, 0, stream1>>>(d_A, d_C, d_E);
-    matMultShared<<<numBlocks, threadsPerBlock, 0, stream1>>>(d_B, d_D, d_temp);
-    vecSub<<<numBlocks, threadsPerBlock, 0, stream1>>>(d_temp, d_E, d_E);
+    matMultShared<<<numBlocks, threadsPerBlock, 0>>>(d_A, d_C, d_E);
+    matMultShared<<<numBlocks, threadsPerBlock, 0>>>(d_B, d_D, d_temp);
+    vecSub<<<numBlocks, threadsPerBlock, 0>>>(d_temp, d_E, d_E);
 
-    matMultShared<<<numBlocks, threadsPerBlock, 0, stream2>>>(d_A, d_D, d_temp2);
-    matMultShared<<<numBlocks, threadsPerBlock, 0, stream2>>>(d_B, d_C, d_F);
-    vecAdd<<<numBlocks, threadsPerBlock, 0, stream2>>>(d_temp2, d_F, d_F);
+    matMultShared<<<numBlocks, threadsPerBlock, 0>>>(d_A, d_D, d_temp2);
+    matMultShared<<<numBlocks, threadsPerBlock, 0>>>(d_B, d_C, d_F);
+    vecAdd<<<numBlocks, threadsPerBlock, 0>>>(d_temp2, d_F, d_F);
 
     cudaMemcpy(E_shared, d_E, N * N * sizeof(double), cudaMemcpyDeviceToHost);
     cudaMemcpy(F_shared, d_F, N * N * sizeof(double), cudaMemcpyDeviceToHost);

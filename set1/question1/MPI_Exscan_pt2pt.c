@@ -33,7 +33,7 @@ int main(int argc, char *argv[])
 
     int result = MPI_Exscan_pt2pt(size, rank, rank);
 
-    usleep(rank * 1000);
+    usleep(rank * 1000);        // Sleep for rank milliseconds to print in order
     printf("rank %d result %d\n", rank, result);
     MPI_Finalize();
 }

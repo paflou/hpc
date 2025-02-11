@@ -22,7 +22,6 @@ void weno_minus_reference(const float * const a, const float * const b, const fl
 		__m256 coef8 = _mm256_set1_ps(5.0f/3.0f);
 
 		// CALCULATION OF is0
-
 		__m256 A = _mm256_mul_ps(a_, coef1);		//a*(4.0f/3.0f)
 		A = _mm256_fmsub_ps(b_, coef2, A);			//a*(4.0f/3.0f) - b*(19.0f/3.0f)
 		A = _mm256_fmadd_ps(c_, coef3, A);			//a*(4.0f/3.0f) - b*(19.0f/3.0f) + c*(11.0f/3.0f)
