@@ -2,39 +2,47 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 # Read data from CSV
-file_name = 'benchmark_results.csv'
-data = pd.read_csv(file_name)
+data = pd.read_csv('performance_data.csv')
 
 # Extract columns
-N = data['N']
-CUDA_time = data['CUDA_time']
-CUBLAS_time = data['CUBLAS_time']
-CPU_time = data['CPU_time']
+Size = data['Size']
+CPU_Time = data['CPU Time']
+CUDA_Global_Time = data['CUDA Global Time']
+CUDA_Shared_Time = data['CUDA Shared Time']
+cuBLAS_Time = data['cuBLAS Time']
 
-Speedup = data['Speedup']
+# Calculate speedups
+Global_Speedup = CPU_Time / CUDA_Global_Time
+Shared_Speedup = CPU_Time / CUDA_Shared_Time
+cuBLAS_Speedup = CPU_Time / cuBLAS_Time
 
 # Plot 1: Execution Times
-plt.figure(figsize=(10, 5))
-plt.plot(N, CUDA_time, marker='o', label='CUDA Time')
-plt.plot(N, CPU_time, marker='o', label='CPU Time')
-plt.xscale('log')
+plt.figure(figsize=(12, 5))
+plt.subplot(1, 2, 1)
+plt.plot(Size, CPU_Time, marker='o', label='CPU')
+plt.plot(Size, CUDA_Global_Time, marker='s', label='CUDA Global')
+plt.plot(Size, CUDA_Shared_Time, marker='^', label='CUDA Shared')
+plt.plot(Size, cuBLAS_Time, marker='*', label='cuBLAS')
+plt.xscale('log', base=2)
 plt.yscale('log')
-plt.xlabel('Problem Size (N)')
+plt.xlabel('Matrix Size (N)')
 plt.ylabel('Execution Time (seconds)')
-plt.title('CUDA vs CPU Execution Time')
+plt.title('Execution Time Comparison')
 plt.legend()
 plt.grid(True)
 
-# Plot 2: Speedup
-plt.figure(figsize=(10, 5))
-plt.plot(N, Speedup, marker='o', label='Speedup', color='green')
-plt.xscale('log')
+# Plot 2: Speedups
+plt.subplot(1, 2, 2)
+plt.plot(Size, Global_Speedup, marker='s', label='CUDA Global')
+plt.plot(Size, Shared_Speedup, marker='^', label='CUDA Shared')
+plt.plot(Size, cuBLAS_Speedup, marker='*', label='cuBLAS')
+plt.xscale('log', base=2)
 plt.yscale('log')
-plt.xlabel('Problem Size (N)')
-plt.ylabel('Speedup')
-plt.title('CUDA Speedup over CPU')
+plt.xlabel('Matrix Size (N)')
+plt.ylabel('Speedup over CPU')
+plt.title('GPU Speedup Comparison')
+plt.legend()
 plt.grid(True)
 
-# Show the plots
 plt.tight_layout()
 plt.show()
