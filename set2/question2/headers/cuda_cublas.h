@@ -3,6 +3,7 @@
 
 #ifndef CUDA_CUBLAS_H
 #define CUDA_CUBLAS_H
+
 void computeCUBLAS(cublasHandle_t handle, double *E_blas, double *F_blas)
 {
     double t1 = get_wtime();

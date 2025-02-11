@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-O3 -fopenmp-simd -fopenmp -ffast-math -fopt-info-vec-optimized
+CFLAGS=-O1 -fopenmp-simd -fopenmp -ffast-math -fopt-info-vec-optimized
 LIBS=-lm
 
 all: clean bench

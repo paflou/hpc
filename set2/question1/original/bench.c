@@ -109,6 +109,9 @@ int main (int argc, char *  argv[])
 {
 	printf("Hello, weno benchmark!\n");
 	const int debug = 0;
+	int times = 4;
+
+	if(argc > 1) times = atoi(argv[1]);
 
 	if (debug)
 	{
@@ -116,30 +119,77 @@ int main (int argc, char *  argv[])
 		return 0;
 	}
 
-	/* performance on cache hits */
 	{
-		const double desired_kb =  16 * 4 * 0.5; /* we want to fill 50% of the dcache */
-		const int nentries =  16 * (int)(pow(32 + 6, 2) * 4);//floor(desired_kb * 1024. / 7 / sizeof(float));
-		const int ntimes = (int)floor(2. / (1e-7 * nentries));
+        const int nentries = 128;  // Small number of entries
+        const int ntimes = 100000; // High repetitions to observe performance
 
-		for(int i=0; i<4; ++i)
-		{
-			printf("*************** PEAK-LIKE BENCHMARK (RUN %d) **************************\n", i);
-			benchmark(argc, argv, nentries, ntimes, 0, "cache");
-		}
-	}
+        for(int i = 0; i < times; ++i)
+        {
+            printf("*************** 0%% CACHE UTILIZATION (RUN %d) **************************\n", i);
+            benchmark(argc, argv, nentries, ntimes, 0, "cache-0%");
+        }
+    }
 
-	/* performance on data streams */
-	{
-		const double desired_mb =  128 * 4;
-		const int nentries =  (int)floor(desired_mb * 1024. * 1024. / 7 / sizeof(float));
+    /* 25% cache utilization */
+    {
+        const int nentries = 16 * (int)(pow(32 + 6, 2) * 4 * 0.25); // 25% of 50%
+        const int ntimes = (int)floor(2. / (1e-7 * nentries));
 
-		for(int i=0; i<4; ++i)
-		{
-			printf("*************** STREAM-LIKE BENCHMARK (RUN %d) **************************\n", i);
-			benchmark(argc, argv, nentries, 1, 0, "stream");
-		}
-	}
+        for(int i = 0; i < times; ++i)
+        {
+            printf("*************** 25%% CACHE UTILIZATION (RUN %d) **************************\n", i);
+            benchmark(argc, argv, nentries, ntimes, 0, "cache-25%");
+        }
+    }
+
+    /* 50% cache utilization (original benchmark) */
+    {
+        const int nentries = 16 * (int)(pow(32 + 6, 2) * 4 * 0.5);
+        const int ntimes = (int)floor(2. / (1e-7 * nentries));
+
+        for(int i = 0; i < times; ++i)
+        {
+            printf("*************** 50%% CACHE UTILIZATION (RUN %d) **************************\n", i);
+            benchmark(argc, argv, nentries, ntimes, 0, "cache-50%");
+        }
+    }
+
+    /* 75% cache utilization */
+    {
+        const int nentries = 16 * (int)(pow(32 + 6, 2) * 4 * .75); // 75% of 50%
+        const int ntimes = (int)floor(2. / (1e-7 * nentries));
+
+        for(int i = 0; i < times; ++i)
+        {
+            printf("*************** 75%% CACHE UTILIZATION (RUN %d) **************************\n", i);
+            benchmark(argc, argv, nentries, ntimes, 0, "cache-75%");
+        }
+    }
+
+    /* 100% cache utilization (original peak-like benchmark) */
+    {
+        const int nentries = 16 * (int)(pow(32 + 6, 2) * 4);
+        const int ntimes = (int)floor(2. / (1e-7 * nentries));
+
+        for(int i = 0; i < times; ++i)
+        {
+            printf("*************** PEAK-LIKE BENCHMARK (RUN %d) **************************\n", i);
+            benchmark(argc, argv, nentries, ntimes, 0, "cache-peak");
+        }
+    }
+
+    /* STREAM-LIKE BENCHMARK (Original) */
+    {
+        const double desired_mb = 128 * 4;
+        const int nentries = (int)floor(desired_mb * 1024. * 1024. / 7 / sizeof(float));
+
+        for(int i = 0; i < times; ++i)
+        {
+            printf("*************** STREAM-LIKE BENCHMARK (RUN %d) **************************\n", i);
+            benchmark(argc, argv, nentries, 1, 0, "stream");
+        }
+    }
+
 
     return 0;
 }

@@ -8,6 +8,7 @@
         "threads.h": "c",
         "cmath": "cpp",
         "chrono": "cpp",
-        "ranges": "cpp"
+        "ranges": "cpp",
+        "format": "cpp"
     }
 }

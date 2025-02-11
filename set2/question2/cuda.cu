@@ -6,7 +6,7 @@
 #include <cublas_v2.h>
 #include <omp.h>
 
-#define N 8192
+#define N 2048
 #include "headers/cuda_shared.h"
 #include "headers/cuda_cublas.h"
 #include "headers/cpu.h"
@@ -15,7 +15,6 @@
 double t1, t2, cuda_global_time, cuda_shared_time, cublas_time, cpu_time;
 double *d_A, *d_B, *d_C, *d_D, *d_E, *d_F;
 double *d_temp, *d_temp2;
-cudaStream_t stream1, stream2;
 
 int main(int argc, char **argv)
 {
@@ -109,7 +108,7 @@ int main(int argc, char **argv)
     compareMatrices(E_cuda, E_blas);
     printf("Comparing shared and blas:\t");
     compareMatrices(E_shared, E_blas);
-    printf("Comparing cpu and blas:\t");
+    printf("Comparing cpu and blas:\t\t");
     compareMatrices(E_CPU, E_blas);
 
     printf("\nF: \n");
@@ -130,7 +129,6 @@ int main(int argc, char **argv)
     printf("Speedup of cublas: %f\n", cublas_speedup);
 
     void cleanupCUDA();
-
     cublasDestroy(handle);
     free(A);
     free(B);

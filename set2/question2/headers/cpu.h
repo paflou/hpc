@@ -14,9 +14,6 @@ void initializeCUDA()
     cudaMalloc((void **)&d_F, sizeof(double) * N * N);
     cudaMalloc((void **)&d_temp, sizeof(double) * N * N);
     cudaMalloc((void **)&d_temp2, sizeof(double) * N * N);
-
-    cudaStreamCreate(&stream1);
-    cudaStreamCreate(&stream2);
 }
 
 void cleanupCUDA()
@@ -29,9 +26,6 @@ void cleanupCUDA()
     cudaFree(d_F);
     cudaFree(d_temp);
     cudaFree(d_temp2);
-
-    cudaStreamDestroy(stream1);
-    cudaStreamDestroy(stream2);
 }
 
 double get_wtime()
@@ -58,10 +52,7 @@ void CPUvecSub(double *a, double *b, double *c)
 }
 
 void CPUmatMult(double *result, double *a, double *b)
-{
-    // Zero the result matrix first
-    // memset(result, 0, N * N * sizeof(double));
-    
+{    
     // Column-major ordering (j,i,k)
     for (int j = 0; j < N; j++)
     {

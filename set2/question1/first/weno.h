@@ -33,8 +33,6 @@ void weno_minus_reference(const float * const __restrict__ a,
                          float * const __restrict__ out,
                          const int NENTRIES)
 {
-    //#pragma omp parallel for
-	#pragma GCC ivdep // tell GCC no aliasing
     for (int i=0; i<NENTRIES; ++i)
         out[i] = weno_minus_core(a[i], b[i], c[i], d[i], e[i]);
 }
