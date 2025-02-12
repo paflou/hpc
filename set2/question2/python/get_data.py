@@ -34,10 +34,9 @@ def compile_cuda():
     if result.returncode != 0:
         raise Exception(f"Compilation failed: {result.stderr}\nCommand was: {cmd}\nWorking dir: {os.getcwd()}")
 
-def run_program(times=3):
+def run_program(times=1):
     cuda_global_times = []
     cuda_shared_times = []
-    cpu_times = []
     cublas_times = []
     
     program_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'cuda'))
@@ -54,11 +53,10 @@ def run_program(times=3):
         # Join lines to handle multi-line output
         output = ' '.join(output.split('\n'))
         
-        # Updated patterns to match full output format
+        # Updated patterns to match full output format; CPU logging removed
         time_patterns = {
             'global': r'Global CUDA:.*?Took\s+([\d.]+)\s+seconds',
             'shared': r'Shared CUDA:.*?Took\s+([\d.]+)\s+seconds',
-            'cpu': r'CPU:.*?Took\s+([\d.]+)\s+seconds',
             'cublas': r'cuBLAS CUDA:.*?Took\s+([\d.]+)\s+seconds'
         }
         
@@ -71,10 +69,6 @@ def run_program(times=3):
             cuda_shared_times.append(float(match.group(1)))
             print(f"Shared time: {match.group(1)}")
             
-        if match := re.search(time_patterns['cpu'], output):
-            cpu_times.append(float(match.group(1)))
-            print(f"CPU time: {match.group(1)}")
-            
         if match := re.search(time_patterns['cublas'], output):
             cublas_times.append(float(match.group(1)))
             print(f"cuBLAS time: {match.group(1)}")
@@ -82,19 +76,19 @@ def run_program(times=3):
     return {
         'cuda_global': mean(cuda_global_times),
         'cuda_shared': mean(cuda_shared_times),
-        'cpu': mean(cpu_times),
         'cublas': mean(cublas_times)
     }
 
-def save_results(results, filename='performance_data.csv'):
+def save_results(results, filename='performance_data2.csv'):
+    # Note: CPU timing column removed
     with open(filename, 'w', newline='') as f:
         writer = csv.writer(f)
-        writer.writerow(['Size', 'CPU Time', 'CUDA Global Time','CUDA Shared Time', 'cuBLAS Time'])
+        writer.writerow(['Size', 'CUDA Global Time', 'CUDA Shared Time', 'cuBLAS Time'])
         for size, times in results.items():
-            writer.writerow([size, times['cpu'], times['cuda_global'], times['cuda_shared'], times['cublas']])
+            writer.writerow([size, times['cuda_global'], times['cuda_shared'], times['cublas']])
 
 def main():
-    matrix_sizes = [2, 4, 8, 16, 32, 64, 128, 512, 1024, 2048, 4096, 8192]
+    matrix_sizes = [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192]
     results = {}
     
     for size in matrix_sizes:
