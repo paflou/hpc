@@ -9,6 +9,12 @@
         "cmath": "cpp",
         "chrono": "cpp",
         "ranges": "cpp",
-        "format": "cpp"
+        "format": "cpp",
+        "target": "c",
+        "omp.h": "c",
+        "array": "c",
+        "string": "c",
+        "string_view": "c",
+        "span": "c"
     }
 }
