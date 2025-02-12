@@ -42,7 +42,7 @@ def compile_openmpGPU():
     os.chdir(source_dir)
     
     # Compile command: adjust flags as needed (e.g., -O3 optimization)
-    cmd = 'gcc openmpGPU.c -o openmpGPU -fopenmp -O3 -lm'
+    cmd = 'gcc openmpGPU.c -o openmpGPU -fopenmp -O3 -lm -fno-lto'
     print("Compiling with command:", cmd)
     result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
     if result.returncode != 0:

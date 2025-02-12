@@ -34,7 +34,7 @@ def compile_cuda():
     if result.returncode != 0:
         raise Exception(f"Compilation failed: {result.stderr}\nCommand was: {cmd}\nWorking dir: {os.getcwd()}")
 
-def run_program(times=1):
+def run_program(times=5):
     cuda_global_times = []
     cuda_shared_times = []
     cublas_times = []

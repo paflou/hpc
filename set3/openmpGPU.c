@@ -7,7 +7,7 @@
 #include <unistd.h>
 
 #define INDEX(i, j) (i * N + j)
-#define N 2048
+#define N 8192
 double t1, t2;
 
 double get_wtime()

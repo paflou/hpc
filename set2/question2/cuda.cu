@@ -6,7 +6,7 @@
 #include <cublas_v2.h>
 #include <omp.h>
 
-#define N 4096
+#define N 8192
 #include "headers/cuda_shared.h"
 #include "headers/cuda_cublas.h"
 #include "headers/cpu.h"
