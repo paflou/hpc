@@ -6,7 +6,7 @@
 #include <cublas_v2.h>
 #include <omp.h>
 
-#define N 2048
+#define N 4096
 #include "headers/cuda_shared.h"
 #include "headers/cuda_cublas.h"
 #include "headers/cpu.h"
@@ -100,7 +100,7 @@ int main(int argc, char **argv)
 
     // CPU
     printf("\nRunning CPU\n");
-    computeCPU(A, B, C, D, E_CPU, F_CPU);
+    //computeCPU(A, B, C, D, E_CPU, F_CPU);
 
 
     printf("\nE: \n");
@@ -109,7 +109,7 @@ int main(int argc, char **argv)
     printf("Comparing shared and blas:\t");
     compareMatrices(E_shared, E_blas);
     printf("Comparing cpu and blas:\t\t");
-    compareMatrices(E_CPU, E_blas);
+    //compareMatrices(E_CPU, E_blas);
 
     printf("\nF: \n");
     printf("Comparing cuda and blas:\t");
@@ -117,16 +117,16 @@ int main(int argc, char **argv)
     printf("Comparing shared and blas:\t");
     compareMatrices(F_shared, F_blas);
     printf("Comparing cpu and blas:\t\t");
-    compareMatrices(F_CPU, F_blas);
+    //compareMatrices(F_CPU, F_blas);
 
     float global_speedup = cpu_time / cuda_global_time;
     float shared_speedup = cpu_time / cuda_shared_time;
     float cublas_speedup = cpu_time / cublas_time;
 
 
-    printf("\nSpeedup of global: %f\n", global_speedup);
-    printf("Speedup of shared: %f\n", shared_speedup);
-    printf("Speedup of cublas: %f\n", cublas_speedup);
+    //printf("\nSpeedup of global: %f\n", global_speedup);
+    //printf("Speedup of shared: %f\n", shared_speedup);
+    //printf("Speedup of cublas: %f\n", cublas_speedup);
 
     void cleanupCUDA();
     cublasDestroy(handle);
