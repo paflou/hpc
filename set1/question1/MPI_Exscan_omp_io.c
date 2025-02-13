@@ -9,10 +9,11 @@
 #define CACHE_LINE_SIZE 64
 
 int T, N;
+int recv_val = 0;
 
 #define INDEX(i, j, k) ((i) * N * N + (j) * N + (k))
 
-void MPI_Exscan_omp_io(int size, int rank, int matrix_size, int *sum)
+void MPI_Exscan_omp_io(int size, int rank, int values[][CACHE_LINE_SIZE], int sum[][CACHE_LINE_SIZE])
 {
     int lsum = 0;
     int thread_num = omp_get_thread_num();
@@ -20,39 +21,41 @@ void MPI_Exscan_omp_io(int size, int rank, int matrix_size, int *sum)
     // each thread computes their local sum serially
     for (int i = 0; i < thread_num; i++)
     {
-        lsum += matrix_size;
+        lsum += values[i][0];
     }
-    sum[thread_num] = lsum;
+    sum[thread_num][0] = lsum;
 
-#pragma omp barrier // wait until all threads are finished
-    //     #pragma omp single
-    //         printf("rank %d, largest thread val = %d\n", rank, sum[T - 1]);
-
-    // compute the prefix sum in parallel
-    for (int step = 1; step < size; step++)
+// printf("thread %d of rank %d starts at %d\n", thread_num, rank, sum[thread_num][0]);
+#pragma omp barrier
+    for (int step = 1; step < size; step *= 2)
     {
-        int partial = 0;
-        if (rank - step >= 0)
+        int send_partner = rank + step;
+        int recv_partner = rank - step;
+        if (recv_partner >= 0)
         {
-            MPI_Recv(&partial, 1, MPI_INT, rank - step, rank + thread_num, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-            // printf("thread %d of rank %d recieved %d\n", thread_num, rank, partial);
-            sum[thread_num] += partial;
-        }
-        if (rank + step < size)
-        {
-            // send your value along with the value of thread T-1
-            // e.g  P0T0 -> P1T0    matrix_size + sum[3] (values of 0, 1, 2 at once)
-            //      P0T1 -> P1T1    matrix_size + sum[3] (values of 0, 1, 2 at once)
-            //      P0T2 -> P1T2    matrix_size + sum[3] (values of 0, 1, 2 at once)
-            //      P0T3 -> P1T3    matrix_size + sum[3] (values of 0, 1, 2 at once)
+            if (omp_get_thread_num() == 0)
+                MPI_Recv(&recv_val, 1, MPI_INT, recv_partner, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            // printf("thread %d of rank %d recieved %d from %d\n", thread_num, rank, partial, rank - step);
 
-            int send_val = sum[T - 1] + matrix_size;
-            MPI_Send(&send_val, 1, MPI_INT, rank + step, rank + step + thread_num, MPI_COMM_WORLD);
+#pragma omp barrier
+#pragma omp for
+            for (int i = 0; i < T; i++)
+            {
+                sum[i][0] += recv_val;
+            }
+#pragma omp barrier
+        }
+        if (send_partner < size)
+        {
+            int send_val = sum[T - 1][0] + values[T - 1][0];
+
+            // printf("thread %d of rank %d sends %d to %d\n", thread_num, rank, send_val, rank + step);
+            if (omp_get_thread_num() == 0)
+                MPI_Bsend(&send_val, 1, MPI_INT, send_partner, 0, MPI_COMM_WORLD);
         }
     }
-    // printf("thread %d of rank %d starts at %d\n", thread_num, rank, sum[thread_num] * (int)sizeof(double));
+    // printf("thread %d of rank %d starts at %d\n", thread_num, rank, sum[thread_num][0]);
 }
-
 void initializeMatrix(double *matrix, unsigned int seed)
 {
     for (int i = 0; i < N; i++)
@@ -145,8 +148,13 @@ int main(int argc, char *argv[])
     MPI_Barrier(MPI_COMM_WORLD);
     MPI_File_open(MPI_COMM_WORLD, filename, MPI_MODE_CREATE | MPI_MODE_RDWR, MPI_INFO_NULL, &file);
 
-    int sum[T];
-#pragma omp parallel num_threads(T) shared(sum)
+    int buffer_size = sizeof(double) + MPI_BSEND_OVERHEAD;
+    char *buffer = malloc(buffer_size * sizeof(char));
+    MPI_Buffer_attach(buffer, buffer_size);
+
+    int matrixSize[T][CACHE_LINE_SIZE];
+    int sum[T][CACHE_LINE_SIZE];
+#pragma omp parallel num_threads(T) shared(sum, matrixSize)
     {
         int unique_num = omp_get_thread_num() + rank * T;
         unsigned int seed = unique_num;
@@ -157,7 +165,7 @@ int main(int argc, char *argv[])
 
         initializeMatrix(matrix, seed);
 
-        int matrixSize = N * N * N;
+        matrixSize[thread_num][0] = N * N * N;
 
 // simutaneously start all threads
 #pragma omp single
@@ -165,15 +173,13 @@ int main(int argc, char *argv[])
 
         MPI_Exscan_omp_io(size, rank, matrixSize, sum);
 
-        int start = sum[thread_num];
-        int end = start + matrixSize;
+        long start = sum[thread_num][0];
+        long end = start + matrixSize[thread_num][0];
         start *= sizeof(double);
         end *= sizeof(double);
 
-        usleep(unique_num * 1000);
-        printf("thread %d begins writing at %d and ends at %d. 1st val = %f\n", unique_num, start, end, matrix[0]);
-        MPI_Barrier(MPI_COMM_WORLD);
-        MPI_File_write_at_all(file, start, matrix, matrixSize, MPI_DOUBLE, &status);
+        // printf("thread %d begins writing at %d and ends at %d. 1st val = %f\n", unique_num, start, end, matrix[0]);
+        MPI_File_write_at_all(file, start, matrix, matrixSize[thread_num][0], MPI_DOUBLE, &status);
         // printf("thread %d finished.\n", unique_num);
 
 #pragma omp single
@@ -184,7 +190,6 @@ int main(int argc, char *argv[])
         }
         free(matrix);
     }
-
     MPI_File_close(&file);
     MPI_Reduce(&local_flag, &global_flag, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
 
