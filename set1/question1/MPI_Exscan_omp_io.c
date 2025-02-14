@@ -31,6 +31,15 @@ void MPI_Exscan_omp_io(int size, int rank, int values[][CACHE_LINE_SIZE], int su
     {
         int send_partner = rank + step;
         int recv_partner = rank - step;
+
+        if (send_partner < size)
+        {
+            int send_val = sum[T - 1][0] + values[T - 1][0];
+
+            // printf("thread %d of rank %d sends %d to %d\n", thread_num, rank, send_val, rank + step);
+            if (omp_get_thread_num() == 0)
+                MPI_Bsend(&send_val, 1, MPI_INT, send_partner, 0, MPI_COMM_WORLD);
+        }
         if (recv_partner >= 0)
         {
             if (omp_get_thread_num() == 0)
@@ -44,14 +53,6 @@ void MPI_Exscan_omp_io(int size, int rank, int values[][CACHE_LINE_SIZE], int su
                 sum[i][0] += recv_val;
             }
 #pragma omp barrier
-        }
-        if (send_partner < size)
-        {
-            int send_val = sum[T - 1][0] + values[T - 1][0];
-
-            // printf("thread %d of rank %d sends %d to %d\n", thread_num, rank, send_val, rank + step);
-            if (omp_get_thread_num() == 0)
-                MPI_Bsend(&send_val, 1, MPI_INT, send_partner, 0, MPI_COMM_WORLD);
         }
     }
     // printf("thread %d of rank %d starts at %d\n", thread_num, rank, sum[thread_num][0]);
@@ -173,14 +174,15 @@ int main(int argc, char *argv[])
 
         MPI_Exscan_omp_io(size, rank, matrixSize, sum);
 
-        long start = sum[thread_num][0];
-        long end = start + matrixSize[thread_num][0];
+        int start = sum[thread_num][0];
+        int end = start + matrixSize[thread_num][0];
         start *= sizeof(double);
         end *= sizeof(double);
-
-        // printf("thread %d begins writing at %d and ends at %d. 1st val = %f\n", unique_num, start, end, matrix[0]);
+        end--;
+        usleep(unique_num * 1000);
+        printf("thread %d begins writing at %d and ends at %d. 1st val = %f\n", unique_num, start, end, matrix[0]);
         MPI_File_write_at_all(file, start, matrix, matrixSize[thread_num][0], MPI_DOUBLE, &status);
-        // printf("thread %d finished.\n", unique_num);
+         printf("thread %d finished.\n", unique_num);
 
 #pragma omp single
         if (checkMatrix(file, &seed, start))

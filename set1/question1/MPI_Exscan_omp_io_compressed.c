@@ -32,6 +32,15 @@ void MPI_Exscan_omp_io(int size, int rank, int values[][CACHE_LINE_SIZE], int su
     {
         int send_partner = rank + step;
         int recv_partner = rank - step;
+        
+        if (send_partner < size)
+        {
+            int send_val = sum[T - 1][0] + values[T - 1][0];
+            
+            //printf("thread %d of rank %d sends %d to %d\n", thread_num, rank, send_val, rank + step);
+            if(omp_get_thread_num() == 0)
+                MPI_Send(&send_val, 1, MPI_INT, send_partner, 0, MPI_COMM_WORLD);
+        }
 
         if (recv_partner >= 0)
         {
@@ -46,16 +55,6 @@ void MPI_Exscan_omp_io(int size, int rank, int values[][CACHE_LINE_SIZE], int su
             }
             #pragma omp barrier
         }
-        
-        if (send_partner < size)
-        {
-            int send_val = sum[T - 1][0] + values[T - 1][0];
-            
-            //printf("thread %d of rank %d sends %d to %d\n", thread_num, rank, send_val, rank + step);
-            if(omp_get_thread_num() == 0)
-                MPI_Send(&send_val, 1, MPI_INT, send_partner, 0, MPI_COMM_WORLD);
-        }
-
     }
     //printf("thread %d of rank %d starts at %d\n", thread_num, rank, sum[thread_num][0]);
 }
@@ -203,7 +202,8 @@ int main(int argc, char *argv[])
         end *= sizeof(unsigned char);   // Use sizeof(unsigned char) for bytes
         end--;
 
-        // printf("thread %d begins writing at %d and ends at %d.\n", unique_num, start, end);
+        usleep(unique_num * 1000);
+         printf("thread %d begins writing at %d and ends at %d.\n", unique_num, start, end);
 
 #pragma omp single
         MPI_Barrier(MPI_COMM_WORLD);

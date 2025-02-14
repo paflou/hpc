@@ -20,7 +20,7 @@ int MPI_Exscan_pt2pt(int size, int rank, int value, MPI_Op op)
             //printf("rank %d computes %d iteration %d\n", rank, result, step);
         }
         if (rank + step < size)
-            MPI_Bsend(&value, 1, MPI_INT, rank + step, rank + step, MPI_COMM_WORLD);
+            MPI_Send(&value, 1, MPI_INT, rank + step, rank + step, MPI_COMM_WORLD);
     }
     //printf("rank %d computes %d\n", rank, result);
     return rank == 0 ? -1 : result;

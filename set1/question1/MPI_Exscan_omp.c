@@ -34,7 +34,6 @@ void MPI_Exscan_omp(int size, int rank, int values[][CACHE_LINE_SIZE], int sum[]
         {
             int send_val = sum[T - 1][0] + values[T - 1][0];
             
-            //printf("thread %d of rank %d sends %d to %d\n", thread_num, rank, send_val, rank + step);
             if(omp_get_thread_num() == 0)
                 MPI_Send(&send_val, 1, MPI_INT, send_partner, 0, MPI_COMM_WORLD);
         }
@@ -42,7 +41,6 @@ void MPI_Exscan_omp(int size, int rank, int values[][CACHE_LINE_SIZE], int sum[]
         {
             if(omp_get_thread_num() == 0)
                 MPI_Recv(&recv_val, 1, MPI_INT, recv_partner, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-           // printf("thread %d of rank %d recieved %d from %d\n", thread_num, rank, partial, rank - step);
 
             // Add received value to all threads' sums
             #pragma omp barrier
