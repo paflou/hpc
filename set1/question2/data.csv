@@ -1,0 +1,2 @@
+processes,serial,multiprocessing_pool,mpi_futures,mpi_master_worker
+1,1,

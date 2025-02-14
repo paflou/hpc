@@ -1,10 +1,9 @@
+from mpi4py.futures import MPICommExecutor
+import time
 from sklearn.neural_network import MLPClassifier
-from sklearn.model_selection import ParameterGrid
+from sklearn.model_selection import ParameterGrid, train_test_split
 from sklearn.datasets import make_classification
 from sklearn.metrics import accuracy_score
-from sklearn.model_selection import train_test_split
-from multiprocessing import Pool
-import time
 
 X, y = make_classification(n_samples=10000, random_state=42, n_features=2, n_informative=2, n_redundant=0, class_sep=0.8)
 
@@ -30,16 +29,20 @@ def evaluate(p):
     print(ac)
     return p, ac
 
-start = time.time()
-with Pool(4) as pool:
-    results = pool.map(evaluate, pg)
-end = time.time()
+def main():
+    start = time.time()
+    with MPICommExecutor() as executor:
+        if executor is None:
+            return
+        # Map the evaluation function over the parameter grid
+        results = list(executor.map(evaluate, pg))
+    
+    end = time.time()
+    
+    for res in results:
+        print(res)
+    
+    print(f"Total Execution Time: {end - start:.2f} seconds")
 
-for r in results:
-    print(r)
-
-
-#for p, ac in results:
-#    print(f"Params: {p}, Accuracy: {ac}")
-
-print(f"Total Execution Time: {end - start:.2f} seconds")
+if __name__ == '__main__':
+    main()
