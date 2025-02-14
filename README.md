@@ -6,13 +6,9 @@ This repository contains code for high-performance computing (HPC) projects as p
 
 - **C**: Main language for performance-critical components.
 - **Python**: Used for scripting and automation tasks.
-- **Cuda**: GPU computing.
-- **Makefile**: Build automation.
+- **Cuda**: Used for GPU computing.
 
-## Getting Started
-
-To get started with this project, clone the repository:
-
+<!--
 ```sh
 git clone https://github.com/paflou/hpc.git
 ```
@@ -51,5 +47,5 @@ This directory contains several MPI and OpenMP implementations for various paral
 
 ### q2c.py
     Employs a master-worker model using MPI to parallelize the grid search. The master process distributes the tasks to worker processes, which perform the training and evaluation.
-
+--->
 
