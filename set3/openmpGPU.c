@@ -6,8 +6,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define INDEX(i, j) (i * N + j)
-#define N 8192
+#define N 512
 double t1, t2;
 
 double get_wtime()
@@ -16,7 +15,6 @@ double get_wtime()
     gettimeofday(&t, NULL);
     return t.tv_sec + t.tv_usec * 1e-6;
 }
-
 void initializeMatrix(double *matrix, unsigned int seed)
 {
 #pragma omp for collapse(2)
@@ -24,25 +22,12 @@ void initializeMatrix(double *matrix, unsigned int seed)
     {
         for (int j = 0; j < N; j++)
         {
-            int index = INDEX(i, j);
+            int index = j * N + i;
             matrix[index] = (double)rand_r(&seed) / RAND_MAX;
             // matrix[index] = 5; // testing
         }
     }
 }
-
-void printMatrix(double *matrix)
-{
-    for (int i = 0; i < N; i++)
-    {
-        for (int j = 0; j < N; j++)
-        {
-            printf("\t%f", matrix[INDEX(i, j)]);
-        }
-        printf("\n");
-    }
-}
-
 int compareMatrices(double *a, double *b)
 {
     for (int i = 0; i < N * N; i++)
@@ -77,18 +62,16 @@ void CPUvecSub(double *a, double *b, double *c)
 void CPUmatMult(double *result, double *a, double *b)
 {    
     // Column-major ordering (j,i,k)
-    for (int j = 0; j < N; j++)
-    {
-        for (int i = 0; i < N; i++)
-        {
-            for (int k = 0; k < N; k++)
-            {
-                result[j * N + i] += a[k * N + i] * b[j * N + k];
+    for (int j = 0; j < N; j++) {
+        for (int i = 0; i < N; i++) {
+            double sum = 0.0;
+            for (int k = 0; k < N; k++) {
+                sum += a[k * N + i] * b[j * N + k];
             }
+            result[j * N + i] = sum;
         }
     }
 }
-
 void GPUvecAdd(double *a, double *b, double *c)
 {
     #pragma omp target teams distribute parallel for simd
@@ -108,7 +91,7 @@ void GPUvecSub(double *a, double *b, double *c)
 void GPUmatMult(double *result, double *a, double *b)
 {    
     // Column-major ordering (j,i,k)
-    #pragma omp target teams distribute parallel for collapse(2)
+    #pragma omp target teams distribute parallel for simd collapse(2)
     for (int j = 0; j < N; j++) {
         for (int i = 0; i < N; i++) {
             double sum = 0.0;
@@ -120,7 +103,6 @@ void GPUmatMult(double *result, double *a, double *b)
     }
     
 }
-
 
 int main(int argc, char **argv)
 {
@@ -142,33 +124,24 @@ int main(int argc, char **argv)
 
 
     double *temp = (double *)malloc(N * N * sizeof(double));
-    double *temp2 = (double *)malloc(N * N * sizeof(double));
-
-
-
-	memset(temp, 0, N * N * sizeof(double));
-    memset(temp2, 0, N * N * sizeof(double));
-    memset(E_gpu, 0, N * N * sizeof(double));
-    memset(F_gpu, 0, N * N * sizeof(double));
 
 	t1 = get_wtime();
-    #pragma omp target data map(to: A, B, C, D) map(from: E_gpu, F_gpu)
+    #pragma omp target data map(to: A, B, C, D) map(alloc: temp) map(from: E_gpu, F_gpu)
     {
         GPUmatMult(E_gpu, A, C);
         GPUmatMult(temp, B, D);
         GPUvecSub(temp, E_gpu, E_gpu);
-    
-        GPUmatMult(temp2, A, D);
+
+        GPUmatMult(temp, A, D);
         GPUmatMult(F_gpu, B, C);
-        GPUvecAdd(temp2, F_gpu, F_gpu);
+        GPUvecAdd(temp, F_gpu, F_gpu);
     }
 	t2 = get_wtime();
 
 	printf("openMP GPU: E[N*N-1]= %f | F[N*N-1] = %f \n Took %.5f seconds\n", E_gpu[N*N-1], F_gpu[N*N-1], t2 - t1);
-/*
+
     //avoid garbage values
     memset(temp, 0, N * N * sizeof(double));
-    memset(temp2, 0, N * N * sizeof(double));
     memset(E, 0, N * N * sizeof(double));
     memset(F, 0, N * N * sizeof(double));
 
@@ -177,17 +150,17 @@ int main(int argc, char **argv)
     CPUmatMult(temp, B, D);
     CPUvecSub(temp, E, E);
 
-    CPUmatMult(temp2, A, D);
+    CPUmatMult(temp, A, D);
     CPUmatMult(F, B, C);
-    CPUvecAdd(temp2, F, F);
+    CPUvecAdd(temp, F, F);
     double t2 = get_wtime();
 
     printf("CPU: E[N*N-1]= %f | F[N*N-1] = %f \n Took %.5f seconds\n", E[N*N-1], F[N*N-1], t2 - t1);
-
+    
 
 	compareMatrices(E_gpu, E);
     compareMatrices(F_gpu, F);
-	*/
+	
 	free(A);
 	free(B);
 	free(C);
@@ -195,6 +168,5 @@ int main(int argc, char **argv)
 	free(E);
 	free(F);
 	free(temp);
-    free(temp2);
     return 0;
 }

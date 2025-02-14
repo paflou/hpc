@@ -10,48 +10,104 @@
 int T;
 int recv_val = 0;
 
-void MPI_Exscan_omp(int size, int rank, int values[][CACHE_LINE_SIZE], int sum[][CACHE_LINE_SIZE])
+void MPI_Exscan_omp(int size, int rank, int values[][CACHE_LINE_SIZE], int sum[][CACHE_LINE_SIZE], MPI_Op op)
 {
     int lsum = 0;
     int thread_num = omp_get_thread_num();
 
     // each thread computes their local sum serially
-    for (int i = 0; i < thread_num; i++)
+    if (op == MPI_SUM)
     {
-        lsum += values[i][0];
+        for (int i = 0; i < thread_num; i++)
+            lsum += values[i][0];
     }
+    else if (op == MPI_PROD)
+    {
+        for (int i = 0; i < thread_num; i++)
+            lsum *= values[i][0];
+    }
+    else if (op == MPI_MAX)
+    {
+        for (int i = 0; i < thread_num; i++)
+            lsum = lsum > values[i][0] ? lsum : values[i][0];
+    }
+    else if (op == MPI_MIN)
+    {
+        for (int i = 0; i < thread_num; i++)
+            lsum = lsum < values[i][0] ? lsum : values[i][0];
+    }
+    else
+    {
+        printf("Invalid MPI_Op\n");
+        return;
+    }
+
     sum[thread_num][0] = lsum;
 
-    //printf("thread %d of rank %d starts at %d\n", thread_num, rank, sum[thread_num][0]);
-    #pragma omp barrier
+// printf("thread %d of rank %d starts at %d\n", thread_num, rank, sum[thread_num][0]);
+#pragma omp barrier
     // compute the prefix sum in parallel
     for (int step = 1; step < size; step *= 2)
     {
         int send_partner = rank + step;
         int recv_partner = rank - step;
 
-        if (send_partner < size)
+#pragma omp single
         {
-            int send_val = sum[T - 1][0] + values[T - 1][0];
-            
-            if(omp_get_thread_num() == 0)
-                MPI_Send(&send_val, 1, MPI_INT, send_partner, 0, MPI_COMM_WORLD);
+            if (send_partner < size)
+            {
+                int send_val = -1;
+                if (op == MPI_SUM)
+                    send_val = sum[T - 1][0] + values[T - 1][0];
+                else if (op == MPI_PROD)
+                    send_val = sum[T - 1][0] * values[T - 1][0];
+                else if (op == MPI_MAX)
+                    send_val = sum[T - 1][0] > values[T - 1][0] ? sum[T - 1][0] : values[T - 1][0];
+                else
+                    send_val = sum[T - 1][0] < values[T - 1][0] ? sum[T - 1][0] : values[T - 1][0];
+
+                MPI_Bsend(&send_val, 1, MPI_INT, send_partner, 0, MPI_COMM_WORLD);
+            }
         }
         if (recv_partner >= 0)
         {
-            if(omp_get_thread_num() == 0)
-                MPI_Recv(&recv_val, 1, MPI_INT, recv_partner, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+#pragma omp single
+            MPI_Recv(&recv_val, 1, MPI_INT, recv_partner, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
             // Add received value to all threads' sums
-            #pragma omp barrier
-            #pragma omp for
-            for (int i = 0; i < T; i++) {
-                sum[i][0] += recv_val;
+
+            if (op == MPI_SUM)
+            {
+#pragma omp barrier
+#pragma omp for
+                for (int i = 0; i < T; i++)
+                    sum[i][0] += recv_val;
             }
-            #pragma omp barrier
+            else if (op == MPI_PROD)
+            {
+#pragma omp barrier
+#pragma omp for
+                for (int i = 0; i < T; i++)
+                    sum[i][0] *= recv_val;
+            }
+            else if (op == MPI_MAX)
+            {
+#pragma omp barrier
+#pragma omp for
+                for (int i = 0; i < T; i++)
+                    sum[i][0] = sum[i][0] > recv_val ? sum[i][0] : recv_val;
+            }
+            else
+            {
+#pragma omp barrier
+#pragma omp for
+                for (int i = 0; i < T; i++)
+                    sum[i][0] = sum[i][0] < recv_val ? sum[i][0] : recv_val;
+            }
         }
     }
-    //printf("thread %d of rank %d starts at %d\n", thread_num, rank, sum[thread_num]);
+
+    // printf("thread %d of rank %d starts at %d\n", thread_num, rank, sum[thread_num]);
 }
 
 int main(int argc, char *argv[])
@@ -78,6 +134,10 @@ int main(int argc, char *argv[])
     int sum[T][CACHE_LINE_SIZE];
     int values[T][CACHE_LINE_SIZE];
 
+    int buffer_size = sizeof(double) + MPI_BSEND_OVERHEAD;
+    char *buffer = malloc(buffer_size * sizeof(char));
+    MPI_Buffer_attach(buffer, buffer_size);
+
 #pragma omp parallel num_threads(T) shared(sum, values)
     {
         int thread_num = omp_get_thread_num();
@@ -88,7 +148,7 @@ int main(int argc, char *argv[])
 #pragma omp single
         MPI_Barrier(MPI_COMM_WORLD);
 
-        MPI_Exscan_omp(size, rank, values, sum);
+        MPI_Exscan_omp(size, rank, values, sum, MPI_SUM);
     }
 
     // print the prefix sum in order
@@ -99,6 +159,6 @@ int main(int argc, char *argv[])
         printf("%d \t", sum[i][0]);
     }
     printf("\n");
-
+    MPI_Buffer_detach(&buffer, &buffer_size);
     MPI_Finalize();
 }

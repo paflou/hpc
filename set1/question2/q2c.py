@@ -6,7 +6,7 @@ from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 import time
 
-X, y = make_classification(n_samples=10000, random_state=42, n_features=2, n_informative=2, n_redundant=0, class_sep=0.8)
+X, y = make_classification(n_samples=90000, random_state=42, n_features=2, n_informative=2, n_redundant=0, class_sep=0.8)
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=42)
 
@@ -29,7 +29,7 @@ def evaluate(p):
     return p, ac
 
 def master():
-    num_workers = size - 1  # Exclude the master
+    num_workers = size - 1 
 
     start_time = time.time()
 
@@ -38,11 +38,9 @@ def master():
         comm.send(p, dest=worker)
         print(f"Master: Sent task {p} to worker {worker}.")
 
-        # Send stop signal to workers
     for worker in range(1, size):
         comm.send(None, dest=worker)
 
-        # Receive results from workers
     results = []
     for _ in enumerate(pg):
         result = comm.recv(source=MPI.ANY_SOURCE)

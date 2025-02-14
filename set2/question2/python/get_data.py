@@ -79,7 +79,7 @@ def run_program(times=5):
         'cublas': mean(cublas_times)
     }
 
-def save_results(results, filename='performance_data2.csv'):
+def save_results(results, filename='performance_data.csv'):
     # Note: CPU timing column removed
     with open(filename, 'w', newline='') as f:
         writer = csv.writer(f)

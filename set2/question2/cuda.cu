@@ -124,9 +124,9 @@ int main(int argc, char **argv)
     float cublas_speedup = cpu_time / cublas_time;
 
 
-    //printf("\nSpeedup of global: %f\n", global_speedup);
-    //printf("Speedup of shared: %f\n", shared_speedup);
-    //printf("Speedup of cublas: %f\n", cublas_speedup);
+    printf("\nSpeedup of global: %f\n", global_speedup);
+    printf("Speedup of shared: %f\n", shared_speedup);
+    printf("Speedup of cublas: %f\n", cublas_speedup);
 
     void cleanupCUDA();
     cublasDestroy(handle);

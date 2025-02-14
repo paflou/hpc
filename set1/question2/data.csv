@@ -1,2 +1,8 @@
-processes,serial,multiprocessing_pool,mpi_futures,mpi_master_worker
-1,1,
+90000 samples   ,2 features
+serial: 76.98s
+
+proc            ,multiprocessing_pool ,mpi_futures ,master_worker
+2               ,37.76                 ,61.5       ,71.07
+4               ,23.14                 ,28.14        ,27.38
+6               ,15.48                 ,24.94        ,24.95
+8               ,12.00                 ,19.72        ,21.19

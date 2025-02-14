@@ -3,8 +3,8 @@
 #include <mpi.h>
 #include <omp.h>
 #include <threads.h>
-#include <unistd.h>
 #include <math.h>
+#include <unistd.h>
 
 #define CACHE_LINE_SIZE 64
 
@@ -13,16 +13,11 @@ int recv_val = 0;
 
 #define INDEX(i, j, k) ((i) * N * N + (j) * N + (k))
 
-void MPI_Exscan_omp_io(int size, int rank, int values[][CACHE_LINE_SIZE], int sum[][CACHE_LINE_SIZE])
+void MPI_Exscan_omp_io(int size, int rank, int values, int sum[][CACHE_LINE_SIZE])
 {
-    int lsum = 0;
     int thread_num = omp_get_thread_num();
+    int lsum = values * thread_num;
 
-    // each thread computes their local sum serially
-    for (int i = 0; i < thread_num; i++)
-    {
-        lsum += values[i][0];
-    }
     sum[thread_num][0] = lsum;
 
 // printf("thread %d of rank %d starts at %d\n", thread_num, rank, sum[thread_num][0]);
@@ -34,7 +29,7 @@ void MPI_Exscan_omp_io(int size, int rank, int values[][CACHE_LINE_SIZE], int su
 
         if (send_partner < size)
         {
-            int send_val = sum[T - 1][0] + values[T - 1][0];
+            int send_val = sum[T - 1][0] + values;
 
             // printf("thread %d of rank %d sends %d to %d\n", thread_num, rank, send_val, rank + step);
             if (omp_get_thread_num() == 0)
@@ -83,7 +78,7 @@ int checkMatrix(MPI_File file, unsigned int *seed, int offset)
     double *values = (double *)malloc(N * N * N * sizeof(double));
     int error_found = 0;
 
-    MPI_File_read_at_all(file, offset, values, N * N * N, MPI_DOUBLE, &status);
+    MPI_File_read_at(file, offset, values, N * N * N, MPI_DOUBLE, &status);
     for (int i = 0; i < N; i++)
     {
         for (int j = 0; j < N; j++)
@@ -153,9 +148,9 @@ int main(int argc, char *argv[])
     char *buffer = malloc(buffer_size * sizeof(char));
     MPI_Buffer_attach(buffer, buffer_size);
 
-    int matrixSize[T][CACHE_LINE_SIZE];
+    int matrixSize = N * N * N;
     int sum[T][CACHE_LINE_SIZE];
-#pragma omp parallel num_threads(T) shared(sum, matrixSize)
+#pragma omp parallel num_threads(T) shared(sum)
     {
         int unique_num = omp_get_thread_num() + rank * T;
         unsigned int seed = unique_num;
@@ -166,8 +161,6 @@ int main(int argc, char *argv[])
 
         initializeMatrix(matrix, seed);
 
-        matrixSize[thread_num][0] = N * N * N;
-
 // simutaneously start all threads
 #pragma omp single
         MPI_Barrier(MPI_COMM_WORLD);
@@ -175,16 +168,22 @@ int main(int argc, char *argv[])
         MPI_Exscan_omp_io(size, rank, matrixSize, sum);
 
         int start = sum[thread_num][0];
-        int end = start + matrixSize[thread_num][0];
+        int end = start + matrixSize;
         start *= sizeof(double);
         end *= sizeof(double);
         end--;
-        usleep(unique_num * 1000);
-        printf("thread %d begins writing at %d and ends at %d. 1st val = %f\n", unique_num, start, end, matrix[0]);
-        MPI_File_write_at_all(file, start, matrix, matrixSize[thread_num][0], MPI_DOUBLE, &status);
-         printf("thread %d finished.\n", unique_num);
+        
+        //usleep(unique_num * 1000);
+        //printf("thread %d begins writing at %d and ends at %d. 1st val = %f\n", unique_num, start, end, matrix[0]);
 
-#pragma omp single
+        #pragma omp single 
+        {
+            MPI_Barrier(MPI_COMM_WORLD);
+            printf("Writing to file...\n");
+        }
+        MPI_File_write_at(file, start, matrix, matrixSize, MPI_DOUBLE, &status);
+        // printf("thread %d finished.\n", unique_num);
+
         if (checkMatrix(file, &seed, start))
         {
 #pragma omp critical
@@ -194,7 +193,8 @@ int main(int argc, char *argv[])
     }
     MPI_File_close(&file);
     MPI_Reduce(&local_flag, &global_flag, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
-
+    MPI_Buffer_detach(&buffer, &buffer_size);
+    printf("Checking binary file...\n");
     if (rank == 0)
     {
         global_flag ? printf("\nThe binary file is wrong\n") : printf("\nThe binary file is correct\n");

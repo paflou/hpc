@@ -1,6 +1,5 @@
 CC = gcc
-CFLAGS = -fopenmp -O3
-OMPFLAGS = -foffload="-lm" -foffload=nvptx-none --no-enable-fcf-protection
+CFLAGS = -fopenmp -O3 -lm -fno-lto
 TARGET = openmpGPU
 SRC = openmpGPU.c
 

@@ -3,12 +3,11 @@
 #include <mpi.h>
 #include <omp.h>
 #include <threads.h>
-#include <unistd.h>
 #include <zlib.h>
 #include <math.h>
 
 #define CACHE_LINE_SIZE 64
-#define BUFFER 5000
+#define BUFFER 50000
 #define INDEX(i, j, k) ((i) * N * N + (j) * N + (k))
 
 int recv_val = 0;
@@ -39,7 +38,7 @@ void MPI_Exscan_omp_io(int size, int rank, int values[][CACHE_LINE_SIZE], int su
             
             //printf("thread %d of rank %d sends %d to %d\n", thread_num, rank, send_val, rank + step);
             if(omp_get_thread_num() == 0)
-                MPI_Send(&send_val, 1, MPI_INT, send_partner, 0, MPI_COMM_WORLD);
+                MPI_Bsend(&send_val, 1, MPI_INT, send_partner, 0, MPI_COMM_WORLD);
         }
 
         if (recv_partner >= 0)
@@ -165,6 +164,11 @@ int main(int argc, char *argv[])
 
     int matrixSize[T][CACHE_LINE_SIZE];
     int sum[T][CACHE_LINE_SIZE];
+
+    int buffer_size = sizeof(double) + MPI_BSEND_OVERHEAD;
+    char *buffer = malloc(buffer_size * sizeof(char));
+    MPI_Buffer_attach(buffer, buffer_size);
+
 #pragma omp parallel num_threads(T) shared(sum, matrixSize)
     {
         int thread_num = omp_get_thread_num();
@@ -202,11 +206,13 @@ int main(int argc, char *argv[])
         end *= sizeof(unsigned char);   // Use sizeof(unsigned char) for bytes
         end--;
 
-        usleep(unique_num * 1000);
-         printf("thread %d begins writing at %d and ends at %d.\n", unique_num, start, end);
+        //printf("thread %d begins writing at %d and ends at %d.\n", unique_num, start, end);
 
-#pragma omp single
-        MPI_Barrier(MPI_COMM_WORLD);
+        #pragma omp single 
+        {
+            MPI_Barrier(MPI_COMM_WORLD);
+            printf("Writing to file...\n");
+        }
         MPI_File_write_at(file, start, compressed, compressed_len, MPI_BYTE, &status);
         // printf("thread %d finished.\n", unique_num);
 
@@ -221,6 +227,7 @@ int main(int argc, char *argv[])
 
     MPI_File_close(&file);
     MPI_Reduce(&local_flag, &global_flag, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+    MPI_Buffer_detach(&buffer, &buffer_size);
 
     if (rank == 0)
     {

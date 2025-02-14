@@ -6,7 +6,7 @@ from sklearn.model_selection import train_test_split
 from multiprocessing import Pool
 import time
 
-X, y = make_classification(n_samples=10000, random_state=42, n_features=2, n_informative=2, n_redundant=0, class_sep=0.8)
+X, y = make_classification(n_samples=90000, random_state=42, n_features=2, n_informative=2, n_redundant=0, class_sep=0.8)
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=42)
 
@@ -31,7 +31,7 @@ def evaluate(p):
     return p, ac
 
 start = time.time()
-with Pool(4) as pool:
+with Pool(8) as pool:
     results = pool.map(evaluate, pg)
 end = time.time()
 
