@@ -34,7 +34,7 @@ plt.xscale('log', base=2)
 plt.yscale('log')
 plt.xlabel('Matrix Size (N)')
 plt.ylabel('Speedup over CPU')
-plt.title('GPU Speedup Comparison')
+plt.title('Speedup')
 plt.legend()
 plt.grid(True)
 

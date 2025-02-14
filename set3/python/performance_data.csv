@@ -1,4 +1,4 @@
-Size,OpenMP GPU Time (sec),CPU Time
+Size,OpenMP GPU Time,CPU Time
 2,0.33516,0
 4,0.27674,0
 8,0.22886,0.00002

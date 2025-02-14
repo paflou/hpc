@@ -6,7 +6,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define N 512
+#define N 1024
 double t1, t2;
 
 double get_wtime()

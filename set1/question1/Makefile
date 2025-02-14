@@ -20,4 +20,4 @@ MPI_Exscan_omp_io_compressed: MPI_Exscan_omp_io_compressed.c Makefile
 
 
 clean:
-	rm -f MPI_Exscan_pt2pt MPI_Exscan_omp MPI_Exscan_omp_io
+	rm -f MPI_Exscan_pt2pt MPI_Exscan_omp MPI_Exscan_omp_io MPI_Exscan_omp_io_compressed output.bin
