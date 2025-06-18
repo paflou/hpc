@@ -42,14 +42,14 @@ Running all three parallel implementations with **9000 samples and 2 features (d
 #
 # Set 2 - SIMD - CUDA
 ## Question 1: SIMD and WENO5
-Parallelized a WENO5 implementation using different methods and benchmarked the results for different cache usage percentages to accurately guage speedup.
+Vectorized a WENO5 implementation using different methods and benchmarked the results for different cache usage percentages to accurately guage speedup.
 
 ### original
 Contains the refernce implementation with no optimizations other than -O1
 
 ### first
 Only difference between the refernce implmementation are these GCC flags 
-```-march=native -ftree-vectorize ``` and a few changes in ```weno_minus_core``` to help GCC understand the data is aligned so as to perform the optimizations.
+```-march=native -ftree-vectorize ``` and a few changes in ```weno_minus_core``` to help GCC perform the optimizations.
 
 ### second
 An OpenMP vectorization implementation. The benefit of OpenMP vectorization is its simplicity, but we lose out on performance.
