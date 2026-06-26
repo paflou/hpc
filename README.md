@@ -60,8 +60,13 @@ This is an AVX intrinsics implementation. It utilizes AVX intrinsics to perform 
 ## Results
 To guage the performance improvements of the 3 parallel implementations compared to the reference one, we used a benchmark that runs the implementation multiple times, with different cache availability.
 
-![image](https://github.com/user-attachments/assets/5fb4481c-b22b-4c07-825f-1e06495dba5d)
-![image](https://github.com/user-attachments/assets/60dc341d-5487-455c-aad9-a376e25f32d1)
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/5fb4481c-b22b-4c07-825f-1e06495dba5d" />
+</p>
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/60dc341d-5487-455c-aad9-a376e25f32d1" />
+</p>
 
 The AVX intrinsics implementation achieved 8-10x improvement compared to reference, beating out gcc optimizations (6-8x).
 OpenMP was pretty slow compared to the other 2, only managing 3-4x speedup.
@@ -79,7 +84,9 @@ The folder also contains a reference CPU program to compare against.
 ## Results
 As expected, global CUDA performed the worst, followed by shared CUDA, but never quite reaching the performance of a very well optimized library like cuBLAS, which achieved around 25.000x speedup over CPU.
 
-![image](https://github.com/user-attachments/assets/8769f612-c876-479d-a213-919510a01fe8)
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/8769f612-c876-479d-a213-919510a01fe8" />
+</p>
 
 
 #
@@ -87,6 +94,9 @@ As expected, global CUDA performed the worst, followed by shared CUDA, but never
 
 The objective of this set is to use OpenMP GPU to the same program as the CUDA implementation from before. OpenMP was truly seamless to use, needing just a few commands, but the performance benefits were much less impressive.
 The speedup seems to stop increasing at around 100x, while the slowest of the CUDA implementations reached over 1000x.
-![image](https://github.com/user-attachments/assets/501606b7-0adb-46c5-b428-97d9179be2f0)
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/501606b7-0adb-46c5-b428-97d9179be2f0" />
+</p>
 
 As an example, for matrices of size 4096x4096, cuBLAS needed 0.33s (on a Tesla V100 GPU) while OpenMP took 128s.
